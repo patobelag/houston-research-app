@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#fefcf9">
+<title>Félix Conversacional</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>/*@@STYLES@@*/</style>
+</head>
+<body>
+<div class="page">
+  <div class="bar">
+    <span class="logo">Félix</span><span class="tag">CONVERSACIONAL</span>
+    <span class="spacer"></span>
+    <div class="seg" id="seg-scenario"><span class="seg-label" data-i="scenario"></span><button data-v="new" data-i="newUser"></button><button data-v="steady" data-i="steady"></button></div>
+    <div class="seg" id="seg-lang"><button data-v="es">ES</button><button data-v="en">EN</button></div>
+    <div class="seg hide-m" id="seg-theme"><button data-v="light" data-i="light"></button><button data-v="dark" data-i="dark"></button></div>
+    <div class="seg hide-m" id="seg-engine"><span class="seg-label" data-i="voice"></span><button data-v="demo" data-i="demoVoice"></button><button data-v="eleven" id="eng-el">ElevenLabs<small id="eng-el-note"></small></button></div>
+    <button class="reset" id="reset" data-i="reset"></button>
+  </div>
+
+  <div class="stage">
+    <aside class="side left" id="side-left"></aside>
+    <div class="phone-wrap" id="phone-wrap">
+      <div class="phone">
+        <div class="screen" id="screen">
+          <div class="island"></div>
+          <div class="sbar"><span>9:41</span><span class="icons" id="sbar-icons"></span></div>
+          <header class="top" id="top"></header>
+          <main class="convo" id="convo" aria-live="polite"></main>
+          <div class="dock">
+            <div class="caption" id="caption"></div>
+            <div class="chips" id="chips"></div>
+            <form class="kb" id="kb"><input id="kb-input" autocomplete="off"><button type="submit" id="kb-send"></button></form>
+            <div class="controls">
+              <button class="ctl" id="btn-kb"></button>
+              <button class="ctl" id="btn-mute"></button>
+              <button class="orb" id="orb"><span class="ring"></span><span class="ring r2"></span><span class="core"></span><span id="orb-icon"></span></button>
+              <button class="ctl" id="btn-hf"></button>
+              <button class="ctl" id="btn-human"></button>
+            </div>
+            <div class="hint" id="hint"></div>
+          </div>
+          <div class="toast" id="toast"></div>
+        </div>
+      </div>
+    </div>
+    <aside class="side right" id="side-right"></aside>
+  </div>
+</div>
+<script>/*@@CORE@@*/</script>
+<script>/*@@APP@@*/</script>
+</body>
+</html>
