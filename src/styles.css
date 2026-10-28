@@ -249,3 +249,8 @@ input { font: inherit; color: inherit; }
 .calc .arrow { display: none; }
 .badge { white-space: nowrap; }
 .fc-ring, .fc-lbl { display: none; }
+
+/* Logo oficial de Félix */
+.logo-img { height: 24px; width: auto; display: block; }
+.ng-in .logo-img { height: 34px; }
+.fc .logo-img, :root[data-theme="dark"] .logo-img { filter: brightness(0) invert(1); }

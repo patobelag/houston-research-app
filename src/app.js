@@ -91,11 +91,9 @@
 
   // Fully conversational: Félix como compañero financiero, no solo remesas
   function introFC() {
-    const b = (state.bills || []).find((x) => !x.paid);
-    const bal = C.money(state.account.balance, prefs.lang);
     return S(
-      `Hola ${state.user.name}, soy Félix, tu compañero para tu dinero. Te ayudo con tu cuenta y tu tarjeta, a pedir un crédito, mandar dinero a tu familia, pagar servicios y recargar celulares. Hoy tienes ${bal} en tu cuenta.${b ? ` Y ${b.label.es.toLowerCase()} vence el ${b.due.es}, son ${C.money(b.amount, "es")}.` : ""} Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ${b ? "¿La pagamos?" : "¿Qué hacemos?"}`,
-      `Hi ${state.user.name}, I'm Félix, your money companion. I help with your account and card, small loans, sending money to your family, paying bills and phone top-ups. Today you have ${bal} in your account.${b ? ` And ${b.label.en.toLowerCase()} is due ${b.due.en}, ${C.money(b.amount, "en")}.` : ""} To talk to me, tap the button and speak; when you're done, tap it again. ${b ? "Should we pay it?" : "What should we do?"}`);
+      `Hola ${state.user.name}, soy Félix, tu compañero para tu dinero. Conmigo tienes tu cuenta y tu tarjeta de débito, puedes pedir un crédito, mandar dinero a tu familia, pagar servicios y recargar celulares. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ¿Con qué te ayudo hoy?`,
+      `Hi ${state.user.name}, I'm Félix, your money companion. With me you have your account and debit card, you can get a small loan, send money to your family, pay bills and top up phones. To talk to me, tap the button and speak; when you're done, tap it again. What can I help you with today?`);
   }
 
   // ───────── Sesión ─────────
@@ -128,7 +126,7 @@
     state = C.seedState(prefs.scenario, prefs.userName);
     tools = C.makeTools(state, hooks);
     brain = C.makeBrain(state, tools, () => prefs.lang);
-    msgs.push({ role: "felix", text: FC ? brain.greet() : S(`Hola ${state.user.name}, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?`, `Hi ${state.user.name}, I'm Félix. I can send money to your family, add money to your account, or send today so you pay later. What do you need?`) });
+    msgs.push({ role: "felix", text: FC ? S(`Hola ${state.user.name}, soy Félix. ¿Con qué te ayudo hoy?`, `Hi ${state.user.name}, I'm Félix. What can I help you with today?`) : S(`Hola ${state.user.name}, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?`, `Hi ${state.user.name}, I'm Félix. I can send money to your family, add money to your account, or send today so you pay later. What do you need?`) });
     setStatus("idle");
     render();
   }
@@ -487,7 +485,7 @@
 
   function renderTop() {
     if (FC) {
-      $("#top").innerHTML = `<button class="fc-ic" id="fc-mute" title="${t("mute")}">${I(prefs.muted ? "spkOff" : "spk", 20, 1.8)}</button><span class="logo fc-logo">Félix</span><button class="fc-ic" id="fc-help" title="${S("Ayuda", "Help")}">${I("help", 20, 1.8)}</button>`;
+      $("#top").innerHTML = `<button class="fc-ic" id="fc-mute" title="${t("mute")}">${I(prefs.muted ? "spkOff" : "spk", 20, 1.8)}</button><img class="logo-img fc-logo" src="/assets/felix-logotype.svg" alt="Félix"><button class="fc-ic" id="fc-help" title="${S("Ayuda", "Help")}">${I("help", 20, 1.8)}</button>`;
       return;
     }
     const a = state.account;
@@ -560,18 +558,19 @@
     if (aw === "after_quote") return [[S("Sí, envíalo", "Yes, send it"), true], [S("¿Y si mando 300?", "And if I send $300?")]];
     if (aw === "deposit_amount") return [["$50"], ["$100"], ["$200"]];
     if (aw === "human_channel") return [[S("Aquí en la app", "Here in the app")], ["WhatsApp"]];
-    if (FC) return [[S("Sí, págala", "Yes, pay it"), true], [S("¿Qué más puedes hacer?", "What else can you do?")], ["x"], ["x"]];
+    if (FC) return [[S("Ver mi cuenta", "See my account")], [S("Mandar dinero", "Send money")], [S("Pedir un crédito", "Get a loan")], [S("Pagar o recargar", "Pay or top up")]];
     return [[S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?")], [S("Mándale $100 a mi mamá", "Send Mom $100")], [S("Quiero cargar dinero", "I want to add money")], [S("Envía hoy y paga después", "Send now, pay later")]];
   }
   function renderChips() {
     const el = $("#chips");
+    if (FC && brain && status === "thinking") return; // en FC no parpadean mientras Félix piensa o se conecta
     if (!brain || status === "listening" || status === "thinking") { el.innerHTML = ""; return; }
     if (FC) {
       // Solo las acciones del momento (máx. 2). Antes de la primera interacción, 2 ideas para empezar.
       let list = chipList();
       const isDefault = !state.pending && list.length === 4;
       if (isDefault && msgs.some((m) => m.role === "user")) list = [];
-      el.innerHTML = list.slice(0, 2).map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");
+      el.innerHTML = list.slice(0, isDefault ? 4 : 2).map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");
       return;
     }
     el.innerHTML = chipList().map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");

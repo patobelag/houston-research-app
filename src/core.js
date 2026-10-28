@@ -242,7 +242,7 @@
         if (total <= state.account.balance) {
           const cardId = hooks.card("send", { rid: r.id, amount, receive, total, fee: CONFIG.fee, source: "balance" });
           state.pending = { type: "send", rid: r.id, amount, receive, total, cardId };
-          return { status: "ready", recipient_id: r.id, recipient_name: r.name, amount_usd: amount, fee: CONFIG.fee, total_usd: total, receives: receive, currency: CONFIG.rates[r.country].cur, needs_confirmation: true };
+          return { status: "ready", recipient_id: r.id, recipient_name: r.name, amount_usd: amount, fee_usd: CONFIG.fee, total_usd: total, receives_local: receive, currency: CONFIG.rates[r.country].cur, needs_confirmation: true };
         }
         return tools.offer_pay_later({ recipient: r.id, amount_usd: amount, _short: true });
       },
@@ -256,7 +256,7 @@
         const receive = r2(amount * CONFIG.rates[r.country].rate);
         const cardId = hooks.card("paylater", { rid: r.id, amount, receive, plan, shortfall: _short ? r2(amount + CONFIG.fee - state.account.balance) : 0 });
         state.pending = { type: "paylater", rid: r.id, amount, receive, plan, cardId };
-        return { status: _short ? "insufficient_offer_pay_later" : "ready_pay_later", alternative: _short ? "or add money with prepare_deposit" : undefined, balance: state.account.balance, recipient_id: r.id, amount_usd: amount, receives: receive, payments: plan.payments, each: plan.each, total_to_repay: plan.total, needs_confirmation: true };
+        return { status: _short ? "insufficient_offer_pay_later" : "ready_pay_later", alternative: _short ? "or add money with prepare_deposit" : undefined, balance: state.account.balance, recipient_id: r.id, amount_usd: amount, receives_local: receive, currency: CONFIG.rates[r.country].cur, payments: plan.payments, each_usd: plan.each, each: plan.each, total_to_repay_usd: plan.total, needs_confirmation: true };
       },
       offer_loan({ amount_usd, months } = {}) {
         const avail = creditAvailable();
@@ -317,7 +317,7 @@
         const receive = r2(amount * rate), total = r2(amount + CONFIG.fee);
         hooks.card("quote", { rid: r ? r.id : null, country: cc, amount, receive, total, fee: CONFIG.fee });
         state.lastQuote = { rid: r ? r.id : null, amount };
-        return { status: "ok", country: cc, amount_usd: amount, fee: CONFIG.fee, total_usd: total, receives: receive, currency: CONFIG.rates[cc].cur, rate, recipient_id: r ? r.id : null, can_afford: total <= state.account.balance };
+        return { status: "ok", country: cc, amount_usd: amount, fee_usd: CONFIG.fee, total_usd: total, receives_local: receive, currency: CONFIG.rates[cc].cur, rate, recipient_id: r ? r.id : null, can_afford: total <= state.account.balance };
       },
       // ── Cargar dinero a la billetera Félix ──
       prepare_deposit({ amount_usd, source } = {}) {
@@ -533,13 +533,13 @@
           ctx.awaiting = "send_amount"; return S(`¿Cuánto le envío a ${recName(res.recipient_id)}?`, `How much should I send ${recName(res.recipient_id)}?`);
         case "ready": {
           ctx.awaiting = "confirm"; const r = state.recipients.find((x) => x.id === res.recipient_id);
-          return S(`Le envías ${usdSpoken(res.amount_usd, "es")} a ${recName(r.id)}. Recibe ${localSpoken(res.receives, r.country, "es")}. Con la comisión son ${usdSpoken(res.total_usd, "es")} de tu saldo. ¿Lo envío?`,
-            `You're sending ${usdSpoken(res.amount_usd, "en")} to ${recName(r.id)}. They get ${localSpoken(res.receives, r.country, "en")}. With the fee it's ${usdSpoken(res.total_usd, "en")} from your balance. Should I send it?`);
+          return S(`Le envías ${usdSpoken(res.amount_usd, "es")} a ${recName(r.id)}. Recibe ${localSpoken(res.receives_local, r.country, "es")}. Con la comisión son ${usdSpoken(res.total_usd, "es")} de tu saldo. ¿Lo envío?`,
+            `You're sending ${usdSpoken(res.amount_usd, "en")} to ${recName(r.id)}. They get ${localSpoken(res.receives_local, r.country, "en")}. With the fee it's ${usdSpoken(res.total_usd, "en")} from your balance. Should I send it?`);
         }
         case "insufficient_offer_pay_later": {
           ctx.awaiting = "confirm"; const r = state.recipients.find((x) => x.id === res.recipient_id);
-          return S(`Tu saldo es de ${usdSpoken(res.balance, "es")} y no alcanza. Puedo enviarlo hoy y lo pagas después, en ${res.payments} pagos de ${usdSpoken(res.each, "es")} cada quince días. ${cap(recName(r.id))} recibe ${localSpoken(res.receives, r.country, "es")} hoy. ¿Lo envío así?`,
-            `Your balance is ${usdSpoken(res.balance, "en")}, so it's not enough. I can send it today and you pay later, in ${res.payments} payments of ${usdSpoken(res.each, "en")} every two weeks. ${cap(recName(r.id))} gets ${localSpoken(res.receives, r.country, "en")} today. Send it that way?`);
+          return S(`Tu saldo es de ${usdSpoken(res.balance, "es")} y no alcanza. Puedo enviarlo hoy y lo pagas después, en ${res.payments} pagos de ${usdSpoken(res.each, "es")} cada quince días. ${cap(recName(r.id))} recibe ${localSpoken(res.receives_local, r.country, "es")} hoy. ¿Lo envío así?`,
+            `Your balance is ${usdSpoken(res.balance, "en")}, so it's not enough. I can send it today and you pay later, in ${res.payments} payments of ${usdSpoken(res.each, "en")} every two weeks. ${cap(recName(r.id))} gets ${localSpoken(res.receives_local, r.country, "en")} today. Send it that way?`);
         }
         case "over_limit":
           ctx.awaiting = null; return S(`Ese monto pasa tu límite. Tienes ${usdSpoken(res.balance, "es")} de saldo y ${usdSpoken(res.credit_available, "es")} disponibles para pagar después. Dime un monto menor.`,
@@ -556,8 +556,8 @@
       const res = tools.offer_pay_later({ recipient: d.rid, amount_usd: amt });
       if (res.status === "over_limit") { ctx.awaiting = null; return S(`Para pagar después tienes hasta ${usdSpoken(res.credit_available, "es")}. Dime un monto menor.`, `You have up to ${usdSpoken(res.credit_available, "en")} to pay later. Tell me a smaller amount.`); }
       ctx.awaiting = "confirm";
-      return S(`Lo envías hoy y pagas ${res.payments} pagos de ${usdSpoken(res.each, "es")} cada quince días. ${cap(recName(d.rid))} recibe ${localSpoken(res.receives, r.country, "es")}. ¿Lo envío?`,
-        `You send it today and pay ${res.payments} payments of ${usdSpoken(res.each, "en")} every two weeks. ${cap(recName(d.rid))} gets ${localSpoken(res.receives, r.country, "en")}. Send it?`);
+      return S(`Lo envías hoy y pagas ${res.payments} pagos de ${usdSpoken(res.each, "es")} cada quince días. ${cap(recName(d.rid))} recibe ${localSpoken(res.receives_local, r.country, "es")}. ¿Lo envío?`,
+        `You send it today and pay ${res.payments} payments of ${usdSpoken(res.each, "en")} every two weeks. ${cap(recName(d.rid))} gets ${localSpoken(res.receives_local, r.country, "en")}. Send it?`);
     }
 
     // ── Crédito ──
@@ -583,7 +583,7 @@
       const res = tools.show_quote({ recipient: r ? r.id : null, amount_usd: a.currency === "USD" ? a.value : null, amount_local: a.currency === "LOCAL" ? a.value : null });
       ctx.awaiting = "after_quote";
       const who = r ? recName(r.id) : S("tu familiar", "your family");
-      return S(`Si mandas ${usdSpoken(res.amount_usd, "es")}, ${who} recibe ${localSpoken(res.receives, res.country, "es")}. ¿Lo envío?`, `If you send ${usdSpoken(res.amount_usd, "en")}, ${who} gets ${localSpoken(res.receives, res.country, "en")}. Send it?`);
+      return S(`Si mandas ${usdSpoken(res.amount_usd, "es")}, ${who} recibe ${localSpoken(res.receives_local, res.country, "es")}. ¿Lo envío?`, `If you send ${usdSpoken(res.amount_usd, "en")}, ${who} gets ${localSpoken(res.receives_local, res.country, "en")}. Send it?`);
     }
 
     // ── Confirmar / cancelar ──

@@ -3,7 +3,7 @@
 .fc .screen { --screen: #0b2422; --ink: #f2fbf9; --muted: #8fb3ad; --soft: #15322f; --card: #12302d; --line: #234743; background: #0b2422; color: #f2fbf9; }
 .fc .top { justify-content: space-between; padding: 4px 18px 0; }
 .fc .fc-ic { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #cfe9e5; background: rgba(255,255,255,.06); }
-.fc .fc-logo { font-size: 24px; color: #f2fbf9; }
+.fc .fc-logo { height: 22px; }
 
 /* Félix: una gota orgánica que respira. Solo se anima cuando Félix habla o piensa. */
 .fc .fc-ring { display: block; position: relative; width: 150px; height: 150px; margin: 16px auto 4px; flex: none; transition: width .35s, height .35s, transform .12s; }
@@ -50,7 +50,8 @@
 
 /* Dock: Escribir + Hablar */
 .fc .dock { background: linear-gradient(to top, #0b2422 75%, transparent); }
-.fc .chips { justify-content: flex-end; flex-wrap: wrap; overflow: visible; }
+.fc .chips { justify-content: flex-end; flex-wrap: wrap; overflow: visible; min-height: 40px; align-content: flex-end; }
+.fc .chips:empty { display: flex; }
 .fc .chip-b { background: rgba(255,255,255,.07); border-color: #2a4f4b; color: #f2fbf9; }
 .fc .chip-b.pri { background: #2feee4; border-color: #2feee4; color: #052e2c; }
 .fc #btn-mute, .fc #btn-human, .fc #btn-hf { display: none !important; }
