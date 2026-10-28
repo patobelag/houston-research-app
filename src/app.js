@@ -274,7 +274,7 @@
   // ───────── Voz ElevenLabs (Agents, WebRTC) ─────────
   const SDK_URL = "https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm";
   const EL = (() => {
-    let conv = null, mod = null, buf = [], flushT = 0, greeting = null, raf = 0;
+    let conv = null, mod = null, buf = [], flushT = 0, greeting = null, raf = 0, startedAt = 0;
     const api = { connecting: false, lastTyped: null };
 
     function contextString() {
@@ -343,13 +343,13 @@
         if (r.status === 401) { toast(t("elCode")); throw new Error("code"); }
         if (!r.ok) throw new Error("token " + r.status);
         const { token } = await r.json();
+        startedAt = Date.now();
         const onlyGreeting = msgs.length === 1 && msgs[0].role === "felix";
         greeting = onlyGreeting && !firstText ? msgs[0].text : null;
         conv = await mod.Conversation.startSession({
           conversationToken: token,
           connectionType: "webrtc",
-          overrides: { agent: { language: prefs.lang, firstMessage: greeting || "" } },
-          dynamicVariables: { user_context: contextString() },
+          dynamicVariables: { user_context: contextString(), first_message: greeting || " " },
           clientTools: clientTools(),
           onMessage: (m) => {
             const who = m.source || m.role;
@@ -365,7 +365,11 @@
           },
           onModeChange: (m) => { const mode = m && m.mode; if (mode === "speaking") setStatus("speaking"); else if (mode === "listening") setStatus("listening"); },
           onStatusChange: (s) => { if (s && s.status === "disconnected") api.cleanup(); },
-          onDisconnect: () => api.cleanup(),
+          onDisconnect: (d) => {
+            const early = Date.now() - startedAt < 4000;
+            api.cleanup();
+            if (early) { console.error("ElevenLabs desconectó al inicio", d); toast(t("elFail")); }
+          },
           onError: (e) => { console.error("ElevenLabs", e); },
         });
         if (prefs.muted) { try { conv.setVolume({ volume: 0 }); } catch (e) {} }
