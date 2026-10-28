@@ -28,7 +28,7 @@
       elFail: "Félix no pudo conectarse a ElevenLabs (revisa los créditos). Sigo con la voz del navegador.", elCode: "Este link necesita un código de acceso.",
       engEl: "Voz natural con ElevenLabs. Toca para hablar y toca otra vez para que Félix responda.",
       elEnded: "Conversación terminada",
-      ngTitle: "Antes de empezar, ¿cómo te llamas?", ngSub: "Félix te va a llamar por tu nombre durante la prueba.", ngBtn: "Empezar", ngPh: "Tu nombre", rgTitle: (n) => `Hola ${n}, Félix te va a hablar`, rgSub: "Sube el volumen de tu celular. Félix se presenta y te explica cómo usar la app.",
+      ngTitle: "Antes de empezar, ¿cómo te llamas?", ngSub: "Félix te va a llamar por tu nombre durante la prueba.", ngBtn: "Empezar", ngPh: "Tu nombre", rgTitle: (n) => `Hola ${n}, Félix te va a hablar`, fcType: "Escribir", rgSub: "Sube el volumen de tu celular. Félix se presenta y te explica cómo usar la app.",
     },
     en: {
       scenario: "Start", newUser: "New user", steady: "Existing user", light: "Light", dark: "Dark", voice: "Voice",
@@ -50,9 +50,10 @@
       elFail: "I couldn't connect to ElevenLabs. Using the browser voice.", elCode: "This link needs an access code.",
       engEl: "Natural voice with ElevenLabs. Tap to talk, tap again for Félix to answer.",
       elEnded: "Conversation ended",
-      ngTitle: "Before we start, what's your name?", ngSub: "Félix will call you by your name during the test.", ngBtn: "Start", ngPh: "Your name", rgTitle: (n) => `Hi ${n}, Félix is going to talk to you`, rgSub: "Turn up your volume. Félix introduces himself and explains how to use the app.",
+      ngTitle: "Before we start, what's your name?", ngSub: "Félix will call you by your name during the test.", ngBtn: "Start", ngPh: "Your name", rgTitle: (n) => `Hi ${n}, Félix is going to talk to you`, fcType: "Type", rgSub: "Turn up your volume. Félix introduces himself and explains how to use the app.",
     },
   };
+  const FC = !!window.__FC__; // link "Fully conversational": solo Félix, sin pantallas
   const prefs = { scenario: "steady", lang: "es", theme: "light", engine: "demo", handsFree: false, muted: false, kb: false, captions: false };
   const t = (k) => UI[prefs.lang][k] || k;
   const S = (es, en) => (prefs.lang === "en" ? en : es);
@@ -175,9 +176,9 @@
     setCaption(`<span class="ph">${t("listening")}</span>`);
     Voice.listen(prefs.lang, {
       onPartial: (txt) => setCaption(esc(txt)),
-      onLevel: (v) => $("#orb").style.setProperty("--lvl", v.toFixed(3)),
+      onLevel: (v) => setLvl(v),
     }).then((res) => {
-      $("#orb").style.setProperty("--lvl", 0);
+      setLvl(0);
       if (status !== "listening") return;
       setCaption("");
       if (res.text) userSays(res.text, "voz");
@@ -332,7 +333,7 @@
         if (!conv) return;
         try {
           const v = status === "speaking" ? await conv.getOutputVolume() : await conv.getInputVolume();
-          $("#orb").style.setProperty("--lvl", Math.min(1, v * 1.6).toFixed(3));
+          setLvl(Math.min(1, v * 1.6));
         } catch (e) {}
         raf = requestAnimationFrame(loop);
       };
@@ -423,7 +424,7 @@
       setStatus(micOpen ? "listening" : "thinking");
       if (!micOpen) setTimeout(() => { if (status === "thinking" && !micOpen) setStatus("idle"); }, 12000);
     };
-    api.cleanup = () => { micOpen = false; clearInterval(muteT); flush(); conv = null; api.connecting = false; cancelAnimationFrame(raf); $("#orb").style.setProperty("--lvl", 0); if (status !== "idle") setStatus("idle"); };
+    api.cleanup = () => { micOpen = false; clearInterval(muteT); flush(); conv = null; api.connecting = false; cancelAnimationFrame(raf); setLvl(0); if (status !== "idle") setStatus("idle"); };
     api.stop = () => { const c = conv; api.cleanup(); if (c) { try { c.endSession(); } catch (e) {} } };
     api.setMuted = (m) => { try { conv && conv.setVolume({ volume: m ? 0 : 1 }); } catch (e) {} };
     return api;
@@ -432,6 +433,7 @@
   // ───────── Estado visual ─────────
   function setStatus(s) {
     status = s;
+    $("#screen").dataset.st = s;
     const orb = $("#orb");
     orb.className = "orb " + s;
     $("#orb-icon").innerHTML = s === "speaking" ? '<span class="bars"><i></i><i></i><i></i><i></i></span>' : s === "thinking" ? '<span class="tdots"><i></i><i></i><i></i></span>' : s === "listening" ? I("stop", 30, 2) : I("mic", 34, 2);
@@ -439,6 +441,7 @@
     $("#hint").textContent = { idle: t("tapToTalk"), listening: t("listening"), thinking: t("thinking"), speaking: t("speaking") }[s];
     renderChips();
   }
+  function setLvl(v) { $("#screen").style.setProperty("--lvl", Number(v).toFixed(3)); }
   function setCaption(html) { $("#caption").innerHTML = html; }
   let toastT = 0;
   function toast(msg) { const el = $("#toast"); el.textContent = msg; el.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("on"), 2600); }
@@ -457,7 +460,7 @@
     renderChips();
     renderSides();
 
-    $("#btn-kb").innerHTML = I("kb", 22, 1.8); $("#btn-kb").classList.toggle("on", prefs.kb); $("#btn-kb").title = t("kb");
+    $("#btn-kb").innerHTML = I("kb", 22, 1.8); $("#btn-kb").dataset.lbl = t("fcType"); $("#btn-kb").classList.toggle("on", prefs.kb); $("#btn-kb").title = t("kb");
     $("#btn-mute").innerHTML = I(prefs.muted ? "spkOff" : "spk", 22, 1.8); $("#btn-mute").classList.toggle("on", !prefs.muted); $("#btn-mute").title = t("mute");
     $("#btn-hf").innerHTML = I("loop", 21, 1.8); $("#btn-hf").classList.toggle("on", prefs.handsFree || isEL()); $("#btn-hf").title = t("handsFree");
     $("#btn-hf").style.visibility = isEL() ? "hidden" : "visible";
@@ -471,6 +474,10 @@
   }
 
   function renderTop() {
+    if (FC) {
+      $("#top").innerHTML = `<button class="fc-ic" id="fc-mute" title="${t("mute")}">${I(prefs.muted ? "spkOff" : "spk", 20, 1.8)}</button><span class="logo fc-logo">Félix</span><button class="fc-ic" id="fc-help" title="${S("Ayuda", "Help")}">${I("help", 20, 1.8)}</button>`;
+      return;
+    }
     const a = state.account;
     const r = C.CONFIG.rates.MX;
     $("#top").innerHTML = `<button class="avatar" id="btn-name" title="${S("Cambiar nombre", "Change name")}">${esc(state.user.name.charAt(0).toUpperCase())}</button>` +
@@ -481,6 +488,7 @@
   }
 
   function renderConvo() {
+    if (FC) return renderFC();
     const el = $("#convo");
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     const lastF = msgs.map((m) => m.role).lastIndexOf("felix");
@@ -500,6 +508,25 @@
     if (msgs.length !== before) { const kids = el.children; for (let i = Math.max(1, before + 1); i < kids.length; i++) kids[i].classList.add("fade-in"); }
     el.dataset.n = msgs.length;
     if (atBottom || msgs.length !== before) el.scrollTop = el.scrollHeight;
+  }
+
+  // Vista fully conversational: el anillo, la última frase de Félix y la tarjeta del momento
+  function renderFC() {
+    const el = $("#convo");
+    const roles = msgs.map((m) => m.role);
+    const lastU = roles.lastIndexOf("user"), lastF = roles.lastIndexOf("felix");
+    const f = lastF >= 0 ? msgs[lastF].text : "";
+    const turnCards = msgs.slice(lastU + 1).filter((m) => m.role === "card" && cards[m.id]);
+    const card = turnCards.length ? cards[turnCards[turnCards.length - 1].id] : null;
+    const you = lastU > lastF ? msgs[lastU].text : "";
+    const key = [lastF, lastU, card ? card.id + (card.resolved || "") + JSON.stringify(state.transfers) : "", status === "listening"].join("|");
+    if (el.dataset.k === key) return;
+    el.dataset.k = key;
+    el.innerHTML = `<div class="spacer-top"></div>
+      ${you ? `<div class="fc-you fade-in">“${esc(you)}”</div>` : ""}
+      ${f ? `<div class="fc-say fade-in">${esc(f)}</div>` : ""}
+      ${card ? `<div class="fc-card fade-in">${cardHTML(card)}</div>` : ""}`;
+    el.scrollTop = el.scrollHeight;
   }
 
   function chipList() {
@@ -525,6 +552,14 @@
   function renderChips() {
     const el = $("#chips");
     if (!brain || status === "listening" || status === "thinking") { el.innerHTML = ""; return; }
+    if (FC) {
+      // Solo las acciones del momento (máx. 2). Antes de la primera interacción, 2 ideas para empezar.
+      let list = chipList();
+      const isDefault = !state.pending && list.length === 4;
+      if (isDefault && msgs.some((m) => m.role === "user")) list = [];
+      el.innerHTML = list.slice(0, 2).map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");
+      return;
+    }
     el.innerHTML = chipList().map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");
   }
 
@@ -701,6 +736,8 @@
     const say = e.target.closest("[data-say]");
     if (say) { userSays(say.dataset.say, "tap"); return; }
     if (e.target.closest("#btn-cc")) { prefs.captions = !prefs.captions; render(); return; }
+    if (e.target.closest("#fc-mute")) { $("#btn-mute").click(); return; }
+    if (e.target.closest("#fc-help")) { $("#btn-human").click(); return; }
     if (e.target.closest("#btn-name")) { showNameGate(); return; }
     const tst = e.target.closest("[data-toast]");
     if (tst) { toast(t(tst.dataset.toast)); return; }
@@ -727,7 +764,7 @@
   const q = new URLSearchParams(location.search);
   // Solo voz: siempre usuario con cuenta (el onboarding es otro prototipo)
   if (q.get("lang") === "en") prefs.lang = "en";
-  if (q.get("theme") === "dark") prefs.theme = "dark";
+  if (q.get("theme") === "dark" || FC) prefs.theme = "dark";
   // Nombre del tester: se pregunta al inicio (o llega en el link con ?name=)
   function cleanName(v) { const n = String(v || "").trim().replace(/\s+/g, " ").slice(0, 24); return n ? n.charAt(0).toUpperCase() + n.slice(1) : ""; }
   // Pantalla inicial: pide el nombre (si no llegó) y el toque que necesita el navegador para hablar

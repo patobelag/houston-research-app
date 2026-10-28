@@ -180,7 +180,7 @@ input { font: inherit; color: inherit; }
 .hint { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: -2px; min-height: 16px; }
 
 /* Orbe */
-.orb { width: 92px; height: 92px; border-radius: 50%; position: relative; display: grid; place-items: center; color: var(--accent-ink); --lvl: 0; }
+.orb { width: 92px; height: 92px; border-radius: 50%; position: relative; display: grid; place-items: center; color: var(--accent-ink); }
 .orb .core { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #a6fff9, var(--accent) 45%, var(--accent-2)); box-shadow: 0 10px 30px -8px rgba(18,201,191,.7); transition: transform .12s; }
 .orb .ring { position: absolute; inset: -10px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; }
 .orb svg { position: relative; z-index: 2; }
@@ -248,3 +248,4 @@ input { font: inherit; color: inherit; }
 .calc .amt { font-size: 19px; font-weight: 700; letter-spacing: -.4px; }
 .calc .arrow { display: none; }
 .badge { white-space: nowrap; }
+.fc-ring, .fc-lbl { display: none; }

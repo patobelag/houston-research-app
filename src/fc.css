@@ -1,0 +1,47 @@
+/* ───────── Fully conversational: solo Félix ───────── */
+.fc-ring, .fc-lbl { display: none; }
+.fc .screen { --screen: #0b2422; --ink: #f2fbf9; --muted: #8fb3ad; --soft: #15322f; --card: #12302d; --line: #234743; background: #0b2422; color: #f2fbf9; }
+.fc .top { justify-content: space-between; padding: 4px 18px 0; }
+.fc .fc-ic { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #cfe9e5; background: rgba(255,255,255,.06); }
+.fc .fc-logo { font-size: 24px; color: #f2fbf9; }
+
+/* Anillo animado */
+.fc .fc-ring { display: block; position: relative; width: 190px; height: 190px; margin: 26px auto 0; flex: none; transform: scale(calc(1 + var(--lvl, 0) * .18)); transition: transform .12s; }
+.fc .fc-ring .ring { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, #2feee4, #8ff06a, #12c9bf, #2fd2ee, #2feee4); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 36px), #000 calc(100% - 35px)); mask: radial-gradient(farthest-side, transparent calc(100% - 36px), #000 calc(100% - 35px)); animation: fcspin 9s linear infinite; }
+.fc .fc-ring .glow { position: absolute; inset: -30px; border-radius: 50%; background: radial-gradient(circle, rgba(47,238,228,.32), transparent 65%); animation: fcbreath 4s ease-in-out infinite; }
+@keyframes fcspin { to { transform: rotate(360deg); } }
+@keyframes fcbreath { 50% { opacity: .55; transform: scale(.94); } }
+.fc .screen[data-st="speaking"] .fc-ring .ring { animation-duration: 2.2s; }
+.fc .screen[data-st="speaking"] .fc-ring .glow { animation: fctalk .45s ease-in-out infinite alternate; }
+@keyframes fctalk { from { opacity: .6; transform: scale(.95); } to { opacity: 1; transform: scale(1.12); } }
+.fc .screen[data-st="listening"] .fc-ring .ring { animation-duration: 5s; filter: brightness(1.2); }
+.fc .screen[data-st="listening"] .fc-ring .glow { animation: none; opacity: calc(.5 + var(--lvl, 0)); }
+.fc .screen[data-st="thinking"] .fc-ring { transform: scale(.86); }
+.fc .screen[data-st="thinking"] .fc-ring .ring { animation-duration: .9s; }
+
+/* Texto: solo la última frase de Félix */
+.fc .convo { padding: 10px 24px 12px; gap: 12px; }
+.fc .fc-you { color: #8fb3ad; font-size: 14px; line-height: 1.4; }
+.fc .fc-say { font-size: 23px; line-height: 1.3; font-weight: 600; letter-spacing: -.3px; color: #f2fbf9; }
+.fc .fc-card .card { background: #12302d; border-color: #234743; padding: 14px; font-size: 13px; }
+.fc .fc-card .acts { display: none; }
+.fc .fc-card .big { font-size: 26px; }
+.fc .fc-card .receive, .fc .fc-card .calc { background: #0e2826; }
+
+/* Dock: Escribir + Hablar */
+.fc .dock { background: linear-gradient(to top, #0b2422 75%, transparent); }
+.fc .chips { justify-content: flex-end; }
+.fc .chip-b { background: rgba(255,255,255,.07); border-color: #2a4f4b; color: #f2fbf9; }
+.fc .chip-b.pri { background: #2feee4; border-color: #2feee4; color: #052e2c; }
+.fc #btn-mute, .fc #btn-human, .fc #btn-hf { display: none !important; }
+.fc .controls { justify-content: center; gap: 34px; padding-bottom: 14px; position: relative; }
+.fc #btn-kb { width: 56px; height: 56px; background: rgba(255,255,255,.07); color: #cfe9e5; }
+.fc #btn-kb.on { background: #2feee4; color: #052e2c; }
+.fc #btn-kb { position: relative; overflow: visible; }
+.fc #btn-kb::after { content: attr(data-lbl); position: absolute; top: 62px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #8fb3ad; white-space: nowrap; }
+.fc .hint { color: #8fb3ad; }
+.fc .kb input { background: #12302d; border-color: #234743; color: #f2fbf9; }
+.fc .kb button { background: #2feee4; color: #052e2c; }
+.fc .namegate { background: #0b2422; }
+.fc .ng-in .logo { color: #f2fbf9; }
+.fc .ng-in input { background: #12302d; border-color: #234743; color: #f2fbf9; }
