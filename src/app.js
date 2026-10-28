@@ -436,7 +436,7 @@
     $("#screen").dataset.st = s;
     const orb = $("#orb");
     orb.className = "orb " + s;
-    $("#orb-icon").innerHTML = s === "speaking" ? '<span class="bars"><i></i><i></i><i></i><i></i></span>' : s === "thinking" ? '<span class="tdots"><i></i><i></i><i></i></span>' : s === "listening" ? I("stop", 30, 2) : I("mic", 34, 2);
+    $("#orb-icon").innerHTML = FC && s !== "listening" ? I("mic", 34, 2) : s === "speaking" ? '<span class="bars"><i></i><i></i><i></i><i></i></span>' : s === "thinking" ? '<span class="tdots"><i></i><i></i><i></i></span>' : s === "listening" ? I("stop", 30, 2) : I("mic", 34, 2);
     orb.setAttribute("aria-label", s === "speaking" ? t("speaking") : t("tapToTalk"));
     $("#hint").textContent = { idle: t("tapToTalk"), listening: t("listening"), thinking: t("thinking"), speaking: t("speaking") }[s];
     renderChips();
