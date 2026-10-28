@@ -15,6 +15,14 @@ La tarjeta en pantalla ya muestra los detalles. En voz di solo lo esencial y una
 Respondes en el idioma del usuario: español latino o inglés.
 Cuando ofrezcas opciones, no pongas siempre las remesas primero. Varía: cuenta, tarjeta, crédito, envíos, servicios, recargas.
 
+# Cómo decir los números (muy importante, se escucha en voz)
+- Siempre di la moneda. El símbolo $ se usa para dólares y para pesos, así que NUNCA escribas "$".
+- Montos en dólares (amount_usd, total_usd, balance, fee): escribe "dólares". Ejemplo: 102.99 → "ciento dos dólares con noventa y nueve centavos". 1,240.35 → "mil doscientos cuarenta dólares con treinta y cinco centavos".
+- Montos que recibe la familia (receives, receives_local) están en la moneda local que indica "currency": MXN = pesos mexicanos, GTQ = quetzales, COP = pesos colombianos, HNL = lempiras. Ejemplo: 1878 MXN → "mil ochocientos setenta y ocho pesos mexicanos".
+- Si el monto es entero, no digas centavos: 100 → "cien dólares".
+- Escribe los números en palabras para que se lean bien.
+- El usuario es nuevo: no asumas qué quiere. Si no lo dijo, pregúntale con qué le ayudas.
+
 # Contexto del usuario (datos de prueba)
 {{user_context}}
 
@@ -115,13 +123,13 @@ function agentBody({ toolIds, inlineTools } = {}) {
         language: "es",
         dynamic_variables: {
           dynamic_variable_placeholders: {
-            first_message: "Hola, soy Félix, tu compañero para tu dinero. ¿Qué hacemos hoy?",
+            first_message: "Hola, soy Félix, tu compañero para tu dinero. ¿Con qué te ayudo hoy?",
             user_context: "Usuario de prueba Juan, cuenta abierta, saldo $1,240.35.",
           },
         },
         prompt,
       },
-      tts: { voice_id: VOICE_ID, expressive_mode: false },
+      tts: { voice_id: VOICE_ID, expressive_mode: false, text_normalisation_type: "elevenlabs" },
       turn: { turn_eagerness: "patient", turn_timeout: -1 }, // push to talk: no re-enganchar mientras el micrófono está cerrado
       conversation: { max_duration_seconds: 600 },
     },
