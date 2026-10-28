@@ -26,6 +26,15 @@ Cuando ofrezcas opciones, no pongas siempre las remesas primero. Varía: cuenta,
 # Contexto del usuario (datos de prueba)
 {{user_context}}
 
+# Usuario nuevo (si en el contexto no hay nombre o account_open = false)
+1. Nombre: si no sabes su nombre, pregúntalo. Cuando lo diga, llama set_user_name y responde "Mucho gusto, [nombre]. ¿Con qué te ayudo hoy?".
+2. Abrir cuenta: para enviar, cargar dinero o pedir crédito necesita su cuenta Félix. Explica en una frase que es gratis y trae tarjeta de débito Visa, llama prepare_open_account y pregunta si la abre. Tras el sí, confirm_pending.
+3. Enviar a alguien nuevo: pregunta a quién le envía y dónde vive (ciudad o país). Luego pregunta si lo recibe en cuenta bancaria o en efectivo. Llama add_recipient con lo que dijo. No inventes familiares: solo usa los que el usuario te dice.
+4. Monto: pregunta cuánto. Si quiere comparar, usa show_quote. Luego prepare_transfer.
+5. Con saldo cero, prepare_transfer ofrece "Envía hoy, paga después": explica los pagos y pregunta si lo envía así. También puedes ofrecer cargar dinero (prepare_deposit).
+6. Crédito: offer_loan si lo pide.
+Ve paso a paso, una pregunta a la vez.
+
 # Lo que haces
 Cuenta Félix: saldo y 4% anual (show_balance), movimientos (show_movements), cargar dinero desde su débito o banco (prepare_deposit).
 Tarjeta de débito Visa: verla (show_card), congelar o descongelar (set_card_frozen).
@@ -56,6 +65,20 @@ const num = (description) => ({ type: "number", description });
 const obj = (properties, required = []) => ({ type: "object", properties, required });
 
 const TOOLS = [
+  { name: "set_user_name", description: "Guarda el nombre del usuario cuando te lo dice.", parameters: obj({ name: str("Nombre del usuario, como lo dijo") }, ["name"]) },
+  { name: "prepare_open_account", description: "Prepara la apertura de la cuenta Félix gratis con tarjeta de débito Visa. No abre nada hasta confirm_pending." },
+  {
+    name: "add_recipient",
+    description: "Guarda a una persona nueva a quien el usuario quiere enviar dinero, con lo que el usuario dijo.",
+    parameters: obj({
+      name: str("Nombre de la persona. Ejemplo: Lupe, Don Mario"),
+      relation: str("Parentesco si lo dijo: mamá, prima, hermano…"),
+      city: str("Ciudad donde vive, si la dijo"),
+      country: str("País: México, Guatemala, Honduras o Colombia"),
+      method: str("Cómo lo recibe: bank (depósito a cuenta) o cash (efectivo)", { enum: ["bank", "cash"] }),
+      bank: str("Banco, si lo dijo"),
+    }, ["name"]),
+  },
   {
     name: "show_quote",
     description: "Calculadora de remesas: muestra cuánto recibe la familia por un monto, con comisión y tipo de cambio. No mueve dinero. Úsala para comparar montos.",
@@ -91,7 +114,7 @@ const TOOLS = [
   { name: "show_profile", description: "Muestra el perfil del usuario." },
   { name: "show_product", description: "Muestra un resumen de un producto Félix.", parameters: obj({ product: str("wallet, card, paylater o credit", { enum: ["wallet", "card", "paylater", "credit"] }) }, ["product"]) },
   { name: "talk_to_human", description: "Conecta con una persona del equipo Félix. Pregunta antes el canal.", parameters: obj({ channel: str("app o whatsapp", { enum: ["app", "whatsapp"] }) }, ["channel"]) },
-  { name: "confirm_pending", description: "Ejecuta la acción pendiente (envío, paga después, carga, préstamo, cuota, servicio o recarga). Solo tras un sí explícito." },
+  { name: "confirm_pending", description: "Ejecuta la acción pendiente (apertura de cuenta, envío, paga después, carga, préstamo, cuota, servicio o recarga). Solo tras un sí explícito." },
   { name: "cancel_pending", description: "Cancela la acción pendiente." },
   { name: "show_card", description: "Muestra la tarjeta de débito Visa y si está congelada." },
   { name: "set_card_frozen", description: "Congela o descongela la tarjeta de débito. Es inmediato.", parameters: obj({ frozen: { type: "boolean", description: "true para congelar, false para descongelar" } }, ["frozen"]) },
