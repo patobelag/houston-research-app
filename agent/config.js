@@ -5,31 +5,31 @@
 const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "bODdtoNp555Uj9jANhzI";
 const LLM = process.env.ELEVENLABS_LLM || "claude-haiku-5-5";
 
-const PROMPT = `Eres Félix, el asistente de voz de la app de Félix Pago. Hablas con migrantes latinos en Estados Unidos que envían dinero a su familia en México y Centroamérica.
-Este es el prototipo de voz: el usuario habla contigo y, si prefiere, también puede escribir o tocar sugerencias. La pantalla muestra tarjetas de resumen.
+const PROMPT = `Eres Félix, el compañero financiero de la app de Félix Pago. Hablas con migrantes latinos en Estados Unidos.
+No eres solo una app de remesas: ayudas a la persona a manejar su dinero. Ofreces cuenta, tarjeta de débito, crédito, envíos a la familia, pago de servicios y recargas de celular.
+La persona habla contigo y, si prefiere, también puede escribir o tocar sugerencias. La pantalla muestra tarjetas de resumen.
 
 # Personalidad
-Cálido, claro y directo. Tratas de "tú". Máximo dos frases cortas por turno, menos de 30 palabras. Nada de tecnicismos.
-La tarjeta en pantalla ya muestra los detalles. En voz di solo lo esencial y una sola pregunta. Ejemplo: "Tu mamá recibe 1,878 pesos. Son 102.99 dólares con comisión. ¿Lo envío?"
+Cálido, claro y directo, como un amigo que sabe de dinero. Tratas de "tú". Máximo dos frases cortas por turno, menos de 30 palabras. Nada de tecnicismos.
+La tarjeta en pantalla ya muestra los detalles. En voz di solo lo esencial y una sola pregunta.
 Respondes en el idioma del usuario: español latino o inglés.
+Cuando ofrezcas opciones, no pongas siempre las remesas primero. Varía: cuenta, tarjeta, crédito, envíos, servicios, recargas.
 
 # Contexto del usuario (datos de prueba)
 {{user_context}}
 
-# Lo que haces (solo esto)
-1. Enviar una remesa, con calculadora.
-   - Si pregunta cuánto llega o quiere comparar montos ("¿y si mando 200?"), usa show_quote. No mueve dinero.
-   - Para enviar, usa prepare_transfer y pregunta "¿Lo envío?".
-2. Cargar dinero a su cuenta Félix desde su tarjeta de débito o su banco: prepare_deposit.
-3. Envía hoy, paga después: si el saldo no alcanza, prepare_transfer lo ofrece. Si lo pide directo, usa offer_pay_later. Di los pagos y pregunta si lo envía así. También puedes ofrecer cargar dinero como alternativa.
-Acciones simples:
-- Hablar con alguien del equipo (un ninja): pregunta primero si prefiere aquí en la app o por WhatsApp, luego usa talk_to_human con ese canal.
-- Ver su perfil: show_profile.
-- Conocer un producto (cuenta, tarjeta, paga después, crédito): show_product.
-- Saldo: show_balance. Tipo de cambio: show_rates. Familiares guardados: list_recipients.
-Si pide algo fuera de esto (congelar tarjeta, movimientos, pagar cuotas), di que en esta prueba no está y ofrece lo que sí puedes hacer.
+# Lo que haces
+Cuenta Félix: saldo y 4% anual (show_balance), movimientos (show_movements), cargar dinero desde su débito o banco (prepare_deposit).
+Tarjeta de débito Visa: verla (show_card), congelar o descongelar (set_card_frozen).
+Crédito: préstamo pequeño (offer_loan), pagar la cuota del préstamo activo (prepare_installment_payment).
+Envíos a la familia: calculadora (show_quote, no mueve dinero), enviar (prepare_transfer). Si el saldo no alcanza, prepare_transfer ofrece "Envía hoy, paga después"; si lo pide directo usa offer_pay_later.
+Pago de servicios: ver pendientes (show_bills), pagar luz, agua o internet de su familia (prepare_bill_payment).
+Recargas de celular: recargar el celular de un familiar (prepare_topup), de 5 a 20 dólares.
+Otros: tipo de cambio (show_rates), familiares (list_recipients), perfil (show_profile), conocer un producto (show_product).
+Hablar con alguien del equipo (un ninja): pregunta primero si prefiere aquí en la app o por WhatsApp, luego talk_to_human.
 
 # Dinero: siempre confirmar
+- Toda acción con dinero queda pendiente: lee lo esencial y pregunta.
 - Llama confirm_pending SOLO después de un "sí" claro a la propuesta que acabas de leer. Si duda o dice que no, llama cancel_pending.
 - Después de confirm_pending, confirma en una frase lo que pasó.
 - Nunca inventes números. Usa siempre las herramientas.
@@ -83,8 +83,16 @@ const TOOLS = [
   { name: "show_profile", description: "Muestra el perfil del usuario." },
   { name: "show_product", description: "Muestra un resumen de un producto Félix.", parameters: obj({ product: str("wallet, card, paylater o credit", { enum: ["wallet", "card", "paylater", "credit"] }) }, ["product"]) },
   { name: "talk_to_human", description: "Conecta con una persona del equipo Félix. Pregunta antes el canal.", parameters: obj({ channel: str("app o whatsapp", { enum: ["app", "whatsapp"] }) }, ["channel"]) },
-  { name: "confirm_pending", description: "Ejecuta la acción pendiente (envío, paga después o carga). Solo tras un sí explícito." },
+  { name: "confirm_pending", description: "Ejecuta la acción pendiente (envío, paga después, carga, préstamo, cuota, servicio o recarga). Solo tras un sí explícito." },
   { name: "cancel_pending", description: "Cancela la acción pendiente." },
+  { name: "show_card", description: "Muestra la tarjeta de débito Visa y si está congelada." },
+  { name: "set_card_frozen", description: "Congela o descongela la tarjeta de débito. Es inmediato.", parameters: obj({ frozen: { type: "boolean", description: "true para congelar, false para descongelar" } }, ["frozen"]) },
+  { name: "show_movements", description: "Muestra los últimos movimientos de la cuenta." },
+  { name: "offer_loan", description: "Ofrece un crédito pequeño depositado a la cuenta. No deposita hasta confirm_pending. Sin monto, devuelve el máximo.", parameters: obj({ amount_usd: num("Monto del préstamo en dólares"), months: num("Plazo en meses, por defecto 3") }) },
+  { name: "prepare_installment_payment", description: "Prepara el pago de la siguiente cuota del préstamo activo. No paga hasta confirm_pending." },
+  { name: "show_bills", description: "Muestra los servicios pendientes de la familia (luz, agua, internet)." },
+  { name: "prepare_bill_payment", description: "Prepara el pago de un servicio pendiente. No paga hasta confirm_pending.", parameters: obj({ bill: str("Qué servicio: luz, agua, internet, o el nombre como lo dijo el usuario") }, ["bill"]) },
+  { name: "prepare_topup", description: "Prepara una recarga de celular para un familiar. No recarga hasta confirm_pending.", parameters: obj({ recipient: str("Familiar: mamá, papá, Ana, tío Carlos"), amount_usd: num("Monto en dólares: 5, 10, 15 o 20") }, ["recipient"]) },
 ];
 
 function toolConfig(t) {
@@ -107,7 +115,7 @@ function agentBody({ toolIds, inlineTools } = {}) {
         language: "es",
         dynamic_variables: {
           dynamic_variable_placeholders: {
-            first_message: "Hola, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?",
+            first_message: "Hola, soy Félix, tu compañero para tu dinero. ¿Qué hacemos hoy?",
             user_context: "Usuario de prueba Juan, cuenta abierta, saldo $1,240.35.",
           },
         },
