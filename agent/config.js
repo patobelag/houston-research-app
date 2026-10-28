@@ -106,17 +106,21 @@ function agentBody({ toolIds, inlineTools } = {}) {
     name: "Félix Conversacional (prototipo)",
     tags: ["felix", "prototipo", "houston"],
     conversation_config: {
-      agent: { first_message: "Hola, soy Félix. ¿Qué necesitas hoy?", language: "es", prompt },
+      agent: {
+        // El saludo llega como variable dinámica desde la app (no requiere permisos de override)
+        first_message: "{{first_message}}",
+        language: "es",
+        dynamic_variables: {
+          dynamic_variable_placeholders: {
+            first_message: "Hola, soy Félix. ¿Qué necesitas hoy?",
+            user_context: "Usuario de prueba Juan, cuenta abierta, saldo $1,240.35.",
+          },
+        },
+        prompt,
+      },
       tts: { voice_id: VOICE_ID },
       turn: { turn_eagerness: "normal" },
       conversation: { max_duration_seconds: 600 },
-    },
-    platform_settings: {
-      overrides: {
-        conversation_config_override: {
-          agent: { first_message: true, language: true },
-        },
-      },
     },
   };
 }
