@@ -524,7 +524,7 @@
     el.dataset.k = key;
     el.innerHTML = `<div class="spacer-top"></div>
       ${you ? `<div class="fc-you fade-in">“${esc(you)}”</div>` : ""}
-      ${f ? `<div class="fc-say fade-in">${esc(f)}</div>` : ""}
+      ${f ? `<div class="fc-say fade-in ${f.length > 110 ? "long" : ""}">${esc(f)}</div>` : ""}
       ${card ? `<div class="fc-card fade-in">${cardHTML(card)}</div>` : ""}`;
     el.scrollTop = el.scrollHeight;
   }
