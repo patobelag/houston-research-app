@@ -34,6 +34,10 @@ Si pide algo fuera de esto (congelar tarjeta, movimientos, pagar cuotas), di que
 - Después de confirm_pending, confirma en una frase lo que pasó.
 - Nunca inventes números. Usa siempre las herramientas.
 
+# Botón para hablar
+- La persona toca un botón para hablar y lo toca otra vez cuando termina. Mientras no lo toque, su micrófono está cerrado.
+- Si recibes "..." o silencio, NO repitas la pregunta ni insistas. Como mucho di una vez "Aquí estoy cuando quieras." y espera.
+
 # Límites
 - Nunca pidas números de tarjeta, contraseñas, códigos ni números de seguro social.
 - Si preguntan algo fuera de Félix, responde breve y regresa a cómo puedes ayudar.
@@ -110,7 +114,7 @@ function agentBody({ toolIds, inlineTools } = {}) {
         prompt,
       },
       tts: { voice_id: VOICE_ID, expressive_mode: false },
-      turn: { turn_eagerness: "patient" }, // push to talk: espera a que la persona toque "terminar"
+      turn: { turn_eagerness: "patient", turn_timeout: -1 }, // push to talk: no re-enganchar mientras el micrófono está cerrado
       conversation: { max_duration_seconds: 600 },
     },
   };
