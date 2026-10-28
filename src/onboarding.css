@@ -1,0 +1,78 @@
+/* Onboarding (basado en el prototipo de Michu en Houston) */
+.ob { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+.ob-top { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; padding: 4px 16px 8px; }
+.ob-back { width: 34px; height: 34px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; }
+.ob-step { text-align: center; font-size: 12px; color: var(--muted); }
+.ob-prog { height: 4px; background: var(--line); border-radius: 4px; margin: 0 22px 18px; overflow: hidden; }
+.ob-prog i { display: block; height: 100%; background: var(--accent-2); border-radius: 4px; transition: width .4s; }
+.ob-body { flex: 1; padding: 0 22px; display: flex; flex-direction: column; overflow-y: auto; }
+.ob-h { font-size: 26px; font-weight: 700; line-height: 1.15; letter-spacing: -.6px; margin-bottom: 8px; }
+.ob-h.c { text-align: center; }
+.ob-p { font-size: 14px; color: var(--muted); line-height: 1.4; margin-bottom: 18px; }
+.ob-p.c { text-align: center; }
+.ob-demo { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+.ob-foot { padding: 12px 22px 22px; display: flex; flex-direction: column; gap: 10px; }
+.ob-btn { width: 100%; padding: 15px; border-radius: 99px; font-weight: 600; font-size: 15px; text-align: center; background: var(--ink); color: var(--screen); }
+.ob-btn.cy { background: var(--accent); color: var(--accent-ink); }
+.ob-btn.ol { background: transparent; border: 1.5px solid var(--ink); color: var(--ink); }
+.ob-btn:disabled { opacity: .35; }
+.ob-legal { font-size: 11px; color: var(--muted); text-align: center; }
+
+/* Bienvenida */
+.ob-hero { background: var(--accent); margin: -52px 0 0; padding: 80px 20px 30px; border-radius: 0 0 28px 28px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.ob-hero .logo { font-size: 44px; color: #072b29; }
+.ob-hero .art { display: flex; gap: 22px; font-size: 40px; }
+.ob-wel { padding: 26px 22px 0; flex: 1; }
+.ob-wel h1 { font-size: 26px; line-height: 1.15; letter-spacing: -.6px; font-weight: 700; margin-bottom: 8px; }
+
+/* Campos */
+.ob-field { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); background: var(--card); border-radius: 14px; padding: 14px; font-size: 17px; cursor: pointer; }
+.ob-field.on { border-color: var(--ink); }
+.ob-field .cc { border: 0; padding: 0; font-size: 14px; color: var(--ink); font-weight: 600; padding-right: 10px; border-right: 1px solid var(--line); border-radius: 0; }
+.ob-field .ph { color: var(--muted); }
+.ob-lbl { font-size: 12px; color: var(--muted); margin: 10px 0 5px; }
+.ob-in { width: 100%; border: 1.5px solid var(--line); background: var(--card); border-radius: 14px; padding: 13px 14px; font-size: 16px; outline: none; color: var(--ink); }
+.ob-in:focus { border-color: var(--ink); }
+.ob-otp { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 10px; }
+.ob-otp div { aspect-ratio: .82; border: 1.5px solid var(--line); border-radius: 12px; display: grid; place-items: center; font-size: 22px; font-weight: 600; background: var(--card); }
+.ob-otp div.cur { border-color: var(--ink); }
+.ob-sug { margin: 0 14px 6px; background: var(--soft); border-radius: 12px; padding: 8px; text-align: center; }
+.ob-sug small { display: block; font-size: 10.5px; color: var(--muted); }
+.ob-sug b { font-size: 16px; letter-spacing: 2px; }
+.ob-pin { display: flex; gap: 16px; justify-content: center; margin: 14px 0 10px; cursor: pointer; }
+.ob-pin i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); }
+.ob-pin i.f { background: var(--ink); }
+
+/* Teclado */
+.ob-kp { display: grid; grid-template-columns: repeat(3, 1fr); padding: 4px 26px 18px; }
+.ob-kp button { padding: 11px 0; font-size: 24px; font-weight: 500; }
+
+/* Opciones de acceso */
+.ob-opt { display: flex; gap: 12px; align-items: flex-start; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 10px; text-align: left; width: 100%; background: var(--card); }
+.ob-opt.on { border-color: var(--ink); }
+.ob-opt .ic { width: 38px; height: 38px; border-radius: 10px; background: rgba(47,238,228,.25); display: grid; place-items: center; flex: none; }
+.ob-opt .t { font-weight: 600; font-size: 15px; display: flex; gap: 6px; align-items: center; }
+.ob-opt .d { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.ob-opt .rd { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); flex: none; }
+.ob-opt.on .rd { border: 6px solid var(--ink); }
+.ob-rec { font-size: 10px; font-weight: 700; background: #dff76a; color: #24300a; padding: 2px 6px; border-radius: 6px; }
+
+/* Alerta y Face ID */
+.ob-veil { position: absolute; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; z-index: 6; }
+.ob-alert { width: 76%; background: rgba(250,250,250,.97); border-radius: 14px; text-align: center; overflow: hidden; color: #111; }
+.ob-alert .a1 { padding: 16px 14px 12px; }
+.ob-alert b { display: block; font-size: 15px; }
+.ob-alert small { font-size: 12px; color: #555; }
+.ob-alert .ab { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #ddd; }
+.ob-alert .ab button { padding: 11px; color: #0a7aff; font-size: 15px; }
+.ob-alert .ab button + button { border-left: 1px solid #ddd; font-weight: 600; }
+.ob-face { position: absolute; inset: 0; backdrop-filter: blur(14px); background: rgba(80,95,92,.55); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 6; color: #fff; }
+.ob-face .box { width: 96px; height: 96px; border-radius: 22px; background: rgba(255,255,255,.18); display: grid; place-items: center; transition: background .3s; }
+.ob-face.ok .box { background: rgba(19,160,108,.9); }
+.ob-face b { font-size: 16px; }
+.ob-face small { font-size: 12px; opacity: .85; }
+
+/* Éxito */
+.ob-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 26px; gap: 10px; }
+.ob-done .party { font-size: 56px; }
+.sbar { position: relative; z-index: 3; }
