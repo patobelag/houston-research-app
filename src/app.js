@@ -28,7 +28,7 @@
       elFail: "Félix no pudo conectarse a ElevenLabs (revisa los créditos). Sigo con la voz del navegador.", elCode: "Este link necesita un código de acceso.",
       engEl: "Voz natural con ElevenLabs. Toca para hablar y toca otra vez para que Félix responda.",
       elEnded: "Conversación terminada",
-      ngTitle: "Antes de empezar, ¿cómo te llamas?", ngSub: "Félix te va a llamar por tu nombre durante la prueba.", ngBtn: "Empezar", ngPh: "Tu nombre", rgTitle: (n) => `Hola ${n}, Félix te va a hablar`, fcType: "Escribir", rgSub: "Sube el volumen de tu celular. Félix se presenta y te explica cómo usar la app.",
+      ngTitle: "Antes de empezar, ¿cómo te llamas?", ngSub: "Félix te va a llamar por tu nombre durante la prueba.", ngBtn: "Empezar", ngPh: "Tu nombre", rgTitle: (n) => n ? `Hola ${n}, Félix te va a hablar` : `Félix te va a hablar`, fcType: "Escribir", rgSub: "Sube el volumen de tu celular. Félix se presenta y te explica cómo usar la app.",
     },
     en: {
       scenario: "Start", newUser: "New user", steady: "Existing user", light: "Light", dark: "Dark", voice: "Voice",
@@ -50,7 +50,7 @@
       elFail: "I couldn't connect to ElevenLabs. Using the browser voice.", elCode: "This link needs an access code.",
       engEl: "Natural voice with ElevenLabs. Tap to talk, tap again for Félix to answer.",
       elEnded: "Conversation ended",
-      ngTitle: "Before we start, what's your name?", ngSub: "Félix will call you by your name during the test.", ngBtn: "Start", ngPh: "Your name", rgTitle: (n) => `Hi ${n}, Félix is going to talk to you`, fcType: "Type", rgSub: "Turn up your volume. Félix introduces himself and explains how to use the app.",
+      ngTitle: "Before we start, what's your name?", ngSub: "Félix will call you by your name during the test.", ngBtn: "Start", ngPh: "Your name", rgTitle: (n) => n ? `Hi ${n}, Félix is going to talk to you` : `Félix is going to talk to you`, fcType: "Type", rgSub: "Turn up your volume. Félix introduces himself and explains how to use the app.",
     },
   };
   const FC = !!window.__FC__; // link "Fully conversational": solo Félix, sin pantallas
@@ -84,16 +84,17 @@
   const I = (n, s = 22, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
 
   // ───────── Presentación de Félix (primera interacción) ─────────
-  let introDone = false;
+  let introDone = false, namedAt = -1;
   const introText = () => FC ? introFC() : S(
     `Hola ${state.user.name}, soy Félix, tu asistente para mandar dinero a tu familia. Puedo enviar dinero, cargar dinero a tu cuenta, o enviar hoy y que pagues después. Para hablarme, toca el botón turquesa y habla. Cuando termines, tócalo otra vez y te respondo. ¿Qué quieres hacer?`,
     `Hi ${state.user.name}, I'm Félix, your assistant for sending money to your family. I can send money, add money to your account, or send today so you pay later. To talk to me, tap the turquoise button and speak. When you're done, tap it again and I'll answer. What would you like to do?`);
 
   // Fully conversational: Félix como compañero financiero, no solo remesas
   function introFC() {
+    const n = state.user.name;
     return S(
-      `Hola ${state.user.name}, soy Félix, tu compañero para tu dinero. Conmigo tienes tu cuenta y tu tarjeta de débito, puedes pedir un crédito, mandar dinero a tu familia, pagar servicios y recargar celulares. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ¿Con qué te ayudo hoy?`,
-      `Hi ${state.user.name}, I'm Félix, your money companion. With me you have your account and debit card, you can get a small loan, send money to your family, pay bills and top up phones. To talk to me, tap the button and speak; when you're done, tap it again. What can I help you with today?`);
+      `Hola${n ? " " + n : ""}, soy Félix, tu compañero para tu dinero. Conmigo abres tu cuenta con tarjeta de débito, mandas dinero a tu familia, pides un crédito, pagas servicios y recargas celulares. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ${n ? "¿Con qué te ayudo hoy?" : "Para empezar, ¿cómo te llamas?"}`,
+      `Hi${n ? " " + n : ""}, I'm Félix, your money companion. With me you open your account with a debit card, send money to your family, get a loan, pay bills and top up phones. To talk to me, tap the button and speak; when you're done, tap it again. ${n ? "What can I help you with today?" : "To start, what's your name?"}`);
   }
 
   // ───────── Sesión ─────────
@@ -103,6 +104,7 @@
   const hooks = {
     lang: () => prefs.lang,
     card(type, data) {
+      if (type === "named") { namedAt = msgs.length; setTimeout(() => { renderTop(); renderChips(); }, 0); }
       const id = "k" + ++cardSeq;
       cards[id] = { id, type, data, resolved: null };
       if (turnCards) turnCards.push(id);
@@ -123,10 +125,12 @@
     timers = []; msgs = []; cards = {}; started = false;
     Voice.stopAll();
     EL.stop();
-    state = C.seedState(prefs.scenario, prefs.userName);
+    // FC: usuario nuevo, sin datos. Félix le pregunta el nombre por voz.
+    state = FC ? C.seedState("new", prefs.userName || "", { anonymous: true }) : C.seedState(prefs.scenario, prefs.userName);
+    namedAt = -1;
     tools = C.makeTools(state, hooks);
     brain = C.makeBrain(state, tools, () => prefs.lang);
-    msgs.push({ role: "felix", text: FC ? S(`Hola ${state.user.name}, soy Félix. ¿Con qué te ayudo hoy?`, `Hi ${state.user.name}, I'm Félix. What can I help you with today?`) : S(`Hola ${state.user.name}, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?`, `Hi ${state.user.name}, I'm Félix. I can send money to your family, add money to your account, or send today so you pay later. What do you need?`) });
+    msgs.push({ role: "felix", text: FC ? (state.user.name ? S(`Hola ${state.user.name}, soy Félix. ¿Con qué te ayudo hoy?`, `Hi ${state.user.name}, I'm Félix. What can I help you with today?`) : S("Hola, soy Félix. ¿Cómo te llamas?", "Hi, I'm Félix. What's your name?")) : S(`Hola ${state.user.name}, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?`, `Hi ${state.user.name}, I'm Félix. I can send money to your family, add money to your account, or send today so you pay later. What do you need?`) });
     setStatus("idle");
     render();
   }
@@ -141,6 +145,12 @@
       return;
     }
     started = true;
+    if (FC && !state.user.name) {
+      const m = text.match(/(?:me llamo|soy|mi nombre es|my name is|i'm|i am)\s+([A-Za-zÁÉÍÓÚÑáéíóúñü]+)/i);
+      const nm = m ? m[1] : text.split(/\s+/)[0].replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñü]/g, "");
+      msgs.push({ role: "user", text, via }); tools.set_user_name({ name: nm }); render();
+      return felixSays(S(`Mucho gusto, ${state.user.name}. ¿Con qué te ayudo hoy?`, `Nice to meet you, ${state.user.name}. What can I help you with today?`));
+    }
     if (via !== "tap") lastVia = via; // tocar una tarjeta no corta la conversación por voz
     Voice.stopSpeaking();
     msgs.push({ role: "user", text, via });
@@ -302,7 +312,7 @@
       const s = state;
       const recs = s.recipients.map((r) => `${r.name} (${r.rel || "familiar"}, id ${r.id}, ${r.city}, ${r.country})`).join("; ") || "ninguno";
       return [
-        `Nombre: ${s.user.name}. Idioma de la interfaz: ${prefs.lang === "en" ? "inglés" : "español"}.`,
+        `Nombre: ${s.user.name || "todavía no lo sabes; pregúntaselo y guárdalo con set_user_name"}. Idioma de la interfaz: ${prefs.lang === "en" ? "inglés" : "español"}.`,
         `Escenario: ${s.scenario === "new" ? "usuario nuevo" : "usuario actual"}. account_open = ${s.account.open}.`,
         s.account.open ? `Saldo: $${s.account.balance}. Tarjeta débito •••• ${s.account.card ? s.account.card.last4 : "-"}${s.account.card && s.account.card.frozen ? " (congelada)" : ""}.` : "Aún no tiene cuenta ni tarjeta.",
         `Crédito disponible: $${(s.credit.limit - s.credit.used).toFixed(2)}.`,
@@ -526,7 +536,7 @@
     const roles = msgs.map((m) => m.role);
     const lastU = roles.lastIndexOf("user"), lastF = roles.lastIndexOf("felix");
     const f = lastF >= 0 ? msgs[lastF].text : "";
-    const turnCards = msgs.slice(lastU + 1).filter((m) => m.role === "card" && cards[m.id]);
+    const turnCards = msgs.slice(lastU + 1).filter((m) => m.role === "card" && cards[m.id] && cards[m.id].type !== "named");
     const card = turnCards.length ? cards[turnCards[turnCards.length - 1].id] : null;
     const you = lastU > lastF ? msgs[lastU].text : "";
     $("#screen").classList.toggle("has-card", !!card);
@@ -558,7 +568,9 @@
     if (aw === "after_quote") return [[S("Sí, envíalo", "Yes, send it"), true], [S("¿Y si mando 300?", "And if I send $300?")]];
     if (aw === "deposit_amount") return [["$50"], ["$100"], ["$200"]];
     if (aw === "human_channel") return [[S("Aquí en la app", "Here in the app")], ["WhatsApp"]];
-    if (FC) return [[S("Ver mi cuenta", "See my account")], [S("Mandar dinero", "Send money")], [S("Pedir un crédito", "Get a loan")], [S("Pagar o recargar", "Pay or top up")]];
+    if (FC) return state.account.open
+      ? [[S("Mandar dinero", "Send money")], [S("Envía hoy, paga después", "Send now, pay later")], [S("Pedir un crédito", "Get a loan")], [S("Cargar dinero", "Add money")]]
+      : [[S("Abrir mi cuenta", "Open my account")], [S("Mandar dinero", "Send money")], [S("Envía hoy, paga después", "Send now, pay later")], [S("Pedir un crédito", "Get a loan")]];
     return [[S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?")], [S("Mándale $100 a mi mamá", "Send Mom $100")], [S("Quiero cargar dinero", "I want to add money")], [S("Envía hoy y paga después", "Send now, pay later")]];
   }
   function renderChips() {
@@ -569,7 +581,8 @@
       // Solo las acciones del momento (máx. 2). Antes de la primera interacción, 2 ideas para empezar.
       let list = chipList();
       const isDefault = !state.pending && list.length === 4;
-      if (isDefault && msgs.some((m) => m.role === "user")) list = [];
+      if (!state.user.name) list = [];
+      else if (isDefault && msgs.slice(namedAt + 1).some((m) => m.role === "user")) list = [];
       el.innerHTML = list.slice(0, isDefault ? 4 : 2).map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");
       return;
     }
@@ -578,11 +591,12 @@
 
   function renderSides() {
     const groups = FC ? [
-      [S("Cuenta y tarjeta", "Account & card"), [S("¿Cuánto tengo?", "How much do I have?"), S("Muéstrame mis movimientos", "Show my activity"), S("Congela mi tarjeta", "Freeze my card")]],
-      [S("Crédito", "Credit"), [S("Necesito un préstamo de 200 dólares", "I need a $200 loan"), S("Paga mi cuota", "Pay my installment")]],
-      [S("Envíos", "Transfers"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100"), S("Envía hoy y paga después 150 a mi tío Carlos", "Send now, pay later $150 to Uncle Carlos")]],
-      [S("Pagos y recargas", "Bills & top-ups"), [S("Paga la luz de mi mamá", "Pay my mom's electricity"), S("¿Qué servicios tengo pendientes?", "What bills are due?"), S("Recarga 10 dólares al cel de Ana", "Top up $10 to Ana's phone")]],
-      [S("Cuenta", "Account"), [S("Quiero cargar 200 dólares a mi cuenta", "Add $200 to my account"), S("Quiero hablar con alguien", "I want to talk to someone")]],
+      [S("1 · Presentarse", "1 · Introduce yourself"), [S("Me llamo Pato", "My name is Pato")]],
+      [S("2 · Abrir cuenta", "2 · Open account"), [S("Quiero abrir mi cuenta", "I want to open my account"), S("Sí, ábrela", "Yes, open it")]],
+      [S("3 · Enviar a alguien nuevo", "3 · Send to someone new"), [S("Quiero mandarle 100 dólares a mi prima Lupe en Puebla", "I want to send $100 to my cousin Lupe in Puebla"), S("Que lo reciba en efectivo", "Cash pickup, please"), S("¿Cuánto le llega si mando 150?", "How much does she get if I send $150?")]],
+      [S("4 · Envía hoy, paga después", "4 · Send now, pay later"), [S("No tengo saldo, ¿lo puedo pagar después?", "I have no balance, can I pay later?"), S("Sí, envíalo así", "Yes, send it like that")]],
+      [S("5 · Crédito", "5 · Credit"), [S("Necesito un préstamo de 200 dólares", "I need a $200 loan")]],
+      [S("Otros", "Other"), [S("Quiero cargar 100 dólares a mi cuenta", "Add $100 to my account"), S("Quiero hablar con alguien", "I want to talk to someone")]],
     ] : [
       [S("1 · Remesa con calculadora", "1 · Remittance + calculator"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does my mom get if I send $200?"), S("¿Y si mando 300?", "And if I send $300?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100")]],
       [S("2 · Cargar dinero", "2 · Add money"), [S("Quiero cargar 200 dólares a mi cuenta", "I want to add $200 to my account")]],
@@ -704,7 +718,7 @@
         return `<div class="${cls}">${head(S("Día de pago", "Payday"))}<div class="who"><div class="ini">${I("cal", 18, 2)}</div><div><div class="nm">${esc(tr(state.payday))}</div><div class="ds">${S("Te recuerdo enviar ese día", "I'll remind you to send that day")}</div></div></div></div>`;
       case "open_account":
         return `<div class="${cls}">${head(S("Cuenta Félix", "Félix account"), S("Gratis", "Free"), "ok")}${dcardHTML("3307", false)}
-          <div class="bullets">${[S("Sin costo mensual", "No monthly fee"), S("Tarjeta de débito Visa", "Visa debit card"), S("Envía hoy, paga después hasta $150", "Send now, pay later up to $150"), S("Tu dinero gana 4% anual", "Your money earns 4% APY")].map((x) => `<div>${I("check", 16, 2.6)}${x}</div>`).join("")}</div>
+          <div class="bullets">${[S("Sin costo mensual", "No monthly fee"), S("Tarjeta de débito Visa", "Visa debit card"), S(`Envía hoy, paga después hasta ${money(state.credit.limit)}`, `Send now, pay later up to ${money(state.credit.limit)}`), S("Tu dinero gana 4% anual", "Your money earns 4% APY")].map((x) => `<div>${I("check", 16, 2.6)}${x}</div>`).join("")}</div>
           ${acts(c, t("openAcc"), t("notNow"))}</div>`;
       case "account_opened":
         return `<div class="${cls}">${head(S("Cuenta abierta", "Account open"), S("Activa", "Active"), "ok")}${dcardHTML("3307", false)}<div class="rows"><div class="row"><span>${t("balance")}</span><b>${money(state.account.balance)}</b></div><div class="row"><span>${S("Paga después disponible", "Pay later available")}</span><b>${money(state.credit.limit - state.credit.used)}</b></div></div></div>`;
@@ -843,7 +857,7 @@
 
   resetSession();
   fit();
-  if (!(q.get("play") || window.__PLAY__)) showNameGate(!prefs.userName);
+  if (!(q.get("play") || window.__PLAY__)) showNameGate(FC ? false : !prefs.userName);
   // ¿Está configurado ElevenLabs en el servidor? Si sí, es el motor por defecto.
   let elCheck = Promise.resolve();
   if (location.protocol.startsWith("http")) {

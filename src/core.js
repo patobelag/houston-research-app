@@ -49,16 +49,17 @@
   const REL = Object.fromEntries(RELATIONS.map((r) => [r.key, r]));
 
   // ───────────────────────── Estado inicial ─────────────────────────
-  function seedState(scenario, name) {
-    const userName = (name || "Juan").trim() || "Juan";
+  function seedState(scenario, name, opts = {}) {
+    const userName = opts.anonymous ? (name || "").trim() : (name || "Juan").trim() || "Juan";
     const base = { scenario, pending: null, transfers: {}, seq: 1, onb: null, flags: {} };
     if (scenario === "new") {
       return Object.assign(base, {
         user: { name: userName },
         account: { open: false, balance: 0, card: null },
-        credit: { limit: 150, used: 0 },
+        credit: { limit: 300, used: 0 },
         loan: null,
         recipients: [],
+        bills: [], phones: {},
         payday: null,
         movements: [],
         onb: { step: "recipient" },
@@ -170,8 +171,8 @@
     if (!query) return null;
     const t = norm(query);
     for (const r of state.recipients) {
-      const first = norm(r.name.split(" ")[0]);
-      if (new RegExp("\\b" + first + "\\b").test(t) || t === r.id || norm(tr(r.short, "es")) === t || norm(tr(r.short, "en")) === t) return r;
+      const words = norm(r.name).split(" ").filter((w) => w.length > 2 && !/^(don|dona|sra|sr|tia|tio)$/.test(w));
+      if (words.some((w) => new RegExp("\\b" + w + "\\b").test(t)) || t === r.id || norm(tr(r.short, "es")) === t || norm(tr(r.short, "en")) === t) return r;
     }
     const rel = findRelation(t);
     if (rel) return state.recipients.find((r) => r.rel === rel.key) || null;
@@ -287,6 +288,33 @@
         state.recipients = state.recipients.filter((x) => x.id !== id).concat(rec);
         hooks.card("recipient_saved", { rid: id });
         return { status: "ok", recipient_id: id, country: rec.country };
+      },
+      // ── Usuario nuevo: nombre dicho por voz ──
+      set_user_name({ name } = {}) {
+        const n = String(name || "").trim().replace(/\s+/g, " ").split(" ").slice(0, 2).join(" ");
+        if (!n) return { status: "need_name" };
+        state.user.name = n.charAt(0).toUpperCase() + n.slice(1);
+        hooks.card("named", {});
+        return { status: "ok", name: state.user.name };
+      },
+      // ── Destinatario nuevo, dicho de cero ──
+      add_recipient({ name, relation, country, city, method, bank } = {}) {
+        if (!name && !relation) return { status: "need_name" };
+        const rel = relation ? (REL[norm(relation)] || findRelation(norm(relation))) : null;
+        const c = findCity(norm(city || "")) || findCity(norm(country || ""));
+        const cc = c ? c.country : (/guate/i.test(country || "") ? "GT" : /hond/i.test(country || "") ? "HN" : /colom/i.test(country || "") ? "CO" : "MX");
+        const nm = String(name || (rel ? rel.label.es : "Familiar")).trim();
+        const id = norm(nm).replace(/\s/g, "") || (rel ? rel.key : "familiar");
+        const m = /cash|efectivo|tienda|oxxo|elektra|retiro/i.test(method || "") ? "cash" : "bank";
+        const rec = {
+          id, rel: rel ? rel.key : null, name: nm, short: { es: /^(don|doña|tía|tío|sra|sr)\b/i.test(nm) ? nm : nm.split(" ")[0], en: /^(don|doña|tía|tío|sra|sr)\b/i.test(nm) ? nm : nm.split(" ")[0] },
+          city: c ? c.label : (city || CONFIG.rates[cc].name.es), country: cc,
+          method: m === "cash" ? { es: "Efectivo · " + (cc === "MX" ? "Elektra" : cc === "GT" ? "Banrural" : "Banco local"), en: "Cash pickup" } : { es: "Depósito a cuenta" + (bank ? " · " + bank : ""), en: "Bank deposit" + (bank ? " · " + bank : "") },
+          isNew: true,
+        };
+        state.recipients = state.recipients.filter((x) => x.id !== id).concat(rec);
+        hooks.card("recipient_saved", { rid: id });
+        return { status: "ok", recipient_id: id, name: nm, country: cc, currency: CONFIG.rates[cc].cur, method: m };
       },
       save_payday({ payday } = {}) {
         state.payday = payday || { es: "Sin definir", en: "Not set" };
