@@ -85,9 +85,18 @@
 
   // ───────── Presentación de Félix (primera interacción) ─────────
   let introDone = false;
-  const introText = () => S(
+  const introText = () => FC ? introFC() : S(
     `Hola ${state.user.name}, soy Félix, tu asistente para mandar dinero a tu familia. Puedo enviar dinero, cargar dinero a tu cuenta, o enviar hoy y que pagues después. Para hablarme, toca el botón turquesa y habla. Cuando termines, tócalo otra vez y te respondo. ¿Qué quieres hacer?`,
     `Hi ${state.user.name}, I'm Félix, your assistant for sending money to your family. I can send money, add money to your account, or send today so you pay later. To talk to me, tap the turquoise button and speak. When you're done, tap it again and I'll answer. What would you like to do?`);
+
+  // Fully conversational: Félix como compañero financiero, no solo remesas
+  function introFC() {
+    const b = (state.bills || []).find((x) => !x.paid);
+    const bal = C.money(state.account.balance, prefs.lang);
+    return S(
+      `Hola ${state.user.name}, soy Félix, tu compañero para tu dinero. Te ayudo con tu cuenta y tu tarjeta, a pedir un crédito, mandar dinero a tu familia, pagar servicios y recargar celulares. Hoy tienes ${bal} en tu cuenta.${b ? ` Y ${b.label.es.toLowerCase()} vence el ${b.due.es}, son ${C.money(b.amount, "es")}.` : ""} Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ${b ? "¿La pagamos?" : "¿Qué hacemos?"}`,
+      `Hi ${state.user.name}, I'm Félix, your money companion. I help with your account and card, small loans, sending money to your family, paying bills and phone top-ups. Today you have ${bal} in your account.${b ? ` And ${b.label.en.toLowerCase()} is due ${b.due.en}, ${C.money(b.amount, "en")}.` : ""} To talk to me, tap the button and speak; when you're done, tap it again. ${b ? "Should we pay it?" : "What should we do?"}`);
+  }
 
   // ───────── Sesión ─────────
   let state, tools, brain, msgs, cards, timers, cardSeq = 0, turnCards = null, status = "idle", started = false, lastVia = null;
@@ -119,7 +128,7 @@
     state = C.seedState(prefs.scenario, prefs.userName);
     tools = C.makeTools(state, hooks);
     brain = C.makeBrain(state, tools, () => prefs.lang);
-    msgs.push({ role: "felix", text: brain.greet() });
+    msgs.push({ role: "felix", text: FC ? brain.greet() : S(`Hola ${state.user.name}, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?`, `Hi ${state.user.name}, I'm Félix. I can send money to your family, add money to your account, or send today so you pay later. What do you need?`) });
     setStatus("idle");
     render();
   }
@@ -300,6 +309,9 @@
         s.account.open ? `Saldo: $${s.account.balance}. Tarjeta débito •••• ${s.account.card ? s.account.card.last4 : "-"}${s.account.card && s.account.card.frozen ? " (congelada)" : ""}.` : "Aún no tiene cuenta ni tarjeta.",
         `Crédito disponible: $${(s.credit.limit - s.credit.used).toFixed(2)}.`,
         `Familiares guardados: ${recs}.`,
+        `Tarjeta de débito Visa •••• ${s.account.card ? s.account.card.last4 : "-"}${s.account.card && s.account.card.frozen ? " (congelada)" : " (activa)"}.`,
+        s.loan ? `Préstamo activo: cuota ${s.loan.paid + 1} de ${s.loan.n}, $${s.loan.installment}, vence ${s.loan.due.es}.` : "Sin préstamo activo.",
+        `Servicios pendientes: ${(s.bills || []).filter((b) => !b.paid).map((b) => `${b.label.es} (${b.provider}) $${b.amount}, vence ${b.due.es}`).join("; ") || "ninguno"}.`,
         `Día de pago: ${s.payday ? tr(s.payday) : "no definido"}.`,
         `Fecha de hoy: 27 de octubre de 2026.`,
       ].join("\n");
@@ -548,6 +560,7 @@
     if (aw === "after_quote") return [[S("Sí, envíalo", "Yes, send it"), true], [S("¿Y si mando 300?", "And if I send $300?")]];
     if (aw === "deposit_amount") return [["$50"], ["$100"], ["$200"]];
     if (aw === "human_channel") return [[S("Aquí en la app", "Here in the app")], ["WhatsApp"]];
+    if (FC) return [[S("Sí, págala", "Yes, pay it"), true], [S("¿Qué más puedes hacer?", "What else can you do?")], ["x"], ["x"]];
     return [[S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?")], [S("Mándale $100 a mi mamá", "Send Mom $100")], [S("Quiero cargar dinero", "I want to add money")], [S("Envía hoy y paga después", "Send now, pay later")]];
   }
   function renderChips() {
@@ -565,7 +578,13 @@
   }
 
   function renderSides() {
-    const groups = [
+    const groups = FC ? [
+      [S("Cuenta y tarjeta", "Account & card"), [S("¿Cuánto tengo?", "How much do I have?"), S("Muéstrame mis movimientos", "Show my activity"), S("Congela mi tarjeta", "Freeze my card")]],
+      [S("Crédito", "Credit"), [S("Necesito un préstamo de 200 dólares", "I need a $200 loan"), S("Paga mi cuota", "Pay my installment")]],
+      [S("Envíos", "Transfers"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100"), S("Envía hoy y paga después 150 a mi tío Carlos", "Send now, pay later $150 to Uncle Carlos")]],
+      [S("Pagos y recargas", "Bills & top-ups"), [S("Paga la luz de mi mamá", "Pay my mom's electricity"), S("¿Qué servicios tengo pendientes?", "What bills are due?"), S("Recarga 10 dólares al cel de Ana", "Top up $10 to Ana's phone")]],
+      [S("Cuenta", "Account"), [S("Quiero cargar 200 dólares a mi cuenta", "Add $200 to my account"), S("Quiero hablar con alguien", "I want to talk to someone")]],
+    ] : [
       [S("1 · Remesa con calculadora", "1 · Remittance + calculator"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does my mom get if I send $200?"), S("¿Y si mando 300?", "And if I send $300?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100")]],
       [S("2 · Cargar dinero", "2 · Add money"), [S("Quiero cargar 200 dólares a mi cuenta", "I want to add $200 to my account")]],
       [S("3 · Envía hoy, paga después", "3 · Send now, pay later"), [S("Mándale 300 a mi papá y lo pago después", "Send my dad $300 and I'll pay later"), S("Envía hoy y paga después 150 a mi tío Carlos", "Send now, pay later $150 to Uncle Carlos")]],
@@ -711,6 +730,22 @@
       case "profile":
         return `<div class="${cls}">${head(S("Tu perfil", "Your profile"))}<div class="who"><div class="ini" style="background:var(--ink);color:var(--screen)">${esc(state.user.name.charAt(0).toUpperCase())}</div><div><div class="nm">${esc(state.user.name)}</div><div class="ds">${S("Cliente desde marzo 2025", "Member since March 2025")}</div></div></div>
           <div class="rows"><div class="row"><span>${S("Teléfono", "Phone")}</span><b>+1 (713) 555-0142</b></div><div class="row"><span>${S("Tarjeta de débito", "Debit card")}</span><b>•••• ${state.account.card ? state.account.card.last4 : "—"}</b></div><div class="row"><span>${S("Familiares guardados", "Saved recipients")}</span><b>${state.recipients.length}</b></div><div class="row"><span>${S("Acceso", "Sign-in")}</span><b>Face ID</b></div></div></div>`;
+      case "bills": {
+        const rows = (state.bills || []).map((b) => `<div class="it"><div><div class="t">${esc(tr(b.label))}</div><div class="d">${b.provider} · ${b.paid ? S("Pagado", "Paid") : S("Vence", "Due") + " " + esc(tr(b.due))}</div></div><span class="${b.paid ? "pos" : "neg"}">${money(b.amount)}</span></div>`).join("");
+        return `<div class="${cls}">${head(S("Servicios", "Bills"), S("Luz, agua, internet", "Power, water, internet"))}<div class="list">${rows}</div></div>`;
+      }
+      case "bill_pay": case "bill_paid": {
+        const b = state.bills.find((x) => x.id === d.bid), r = recOf(b.rid);
+        const done = c.type === "bill_paid";
+        return `<div class="${cls}">${head(S("Pago de servicio", "Bill payment"), done ? S("Pagado", "Paid") : S("Vence", "Due") + " " + esc(tr(b.due)), done ? "ok" : "warn")}
+          <div class="who"><div class="ini">${esc(b.provider.slice(0, 3))}</div><div><div class="nm">${esc(tr(b.label))}</div><div class="ds">${b.provider} · ${r ? esc(r.city) : ""}</div></div></div>
+          <div class="rows"><div class="row total"><span>${S("Monto", "Amount")}</span><b>${money(b.amount)}</b></div><div class="row"><span>${S("Pagas con", "Paid with")}</span><b>${S("Saldo Félix", "Félix balance")}</b></div></div>${done ? "" : acts(c, S("Pagar", "Pay"))}</div>`;
+      }
+      case "topup": case "topup_done": {
+        const r = recOf(d.rid), done = c.type === "topup_done";
+        return `<div class="${cls}">${head(S("Recarga de celular", "Phone top-up"), done ? S("Lista", "Done") : d.carrier, done ? "ok" : "cyan")}
+          ${whoHTML(r)}<div class="rows"><div class="row"><span>${S("Compañía", "Carrier")}</span><b>${esc(d.carrier || "")}${d.num ? " · " + esc(d.num) : ""}</b></div><div class="row total"><span>${S("Recarga", "Top-up")}</span><b>${money(d.amount)}</b></div></div>${done ? "" : acts(c, S("Recargar", "Top up"))}</div>`;
+      }
       case "product": {
         const P2 = {
           wallet: [S("Cuenta Félix", "Félix account"), [S("Gratis, sin costo mensual", "Free, no monthly fee"), S("Tu dinero gana 4% anual", "Your money earns 4% APY"), S("Carga desde cualquier débito al instante", "Add money from any debit card instantly")]],

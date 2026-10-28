@@ -76,6 +76,12 @@
         { id: "carlos", rel: "tio", name: "Carlos Pérez", short: { es: "Tío Carlos", en: "Uncle Carlos" }, city: "Quetzaltenango", country: "GT", method: { es: "Efectivo · Banrural", en: "Cash pickup · Banrural" } },
       ],
       payday: { es: "Cada viernes", en: "Every Friday" },
+      bills: [
+        { id: "luz_mama", kind: "luz", provider: "CFE", rid: "mama", label: { es: "Luz de Mamá", en: "Mom's electricity" }, amount: 50, due: { es: "8 de noviembre", en: "November 8" }, paid: false },
+        { id: "agua_mama", kind: "agua", provider: "SIAPA", rid: "mama", label: { es: "Agua de Mamá", en: "Mom's water" }, amount: 18.5, due: { es: "15 de noviembre", en: "November 15" }, paid: false },
+        { id: "internet_papa", kind: "internet", provider: "Telmex", rid: "papa", label: { es: "Internet de Papá", en: "Dad's internet" }, amount: 25, due: { es: "20 de noviembre", en: "November 20" }, paid: false },
+      ],
+      phones: { mama: { carrier: "Telcel", num: "••• 4412" }, papa: { carrier: "Telcel", num: "••• 9031" }, ana: { carrier: "AT&T México", num: "••• 7781" }, carlos: { carrier: "Tigo", num: "••• 2207" } },
       movements: [
         { id: "m1", kind: "in", title: { es: "Depósito de nómina", en: "Payroll deposit" }, date: { es: "24 oct", en: "Oct 24" }, amount: 480 },
         { id: "m2", kind: "out", title: { es: "Envío a Ana", en: "Transfer to Ana" }, date: { es: "20 oct", en: "Oct 20" }, amount: -152.99 },
@@ -323,6 +329,33 @@
         state.pending = { type: "deposit", amount, source: src, cardId };
         return { status: "ready", amount_usd: amount, source: src === "bank" ? "Chase checking ••0917" : "Chase debit ••5521", fee: 0, arrives: src === "bank" ? "1-3 business days" : "instant", new_balance: r2(state.account.balance + amount), needs_confirmation: true };
       },
+      // ── Pago de servicios (luz, agua, internet) ──
+      show_bills() {
+        hooks.card("bills", {});
+        return { bills: (state.bills || []).map((b) => ({ id: b.id, name: b.label.en, provider: b.provider, amount_usd: b.amount, due: b.due.en, paid: b.paid })) };
+      },
+      prepare_bill_payment({ bill } = {}) {
+        const list = state.bills || [];
+        const q = norm(bill || "");
+        const b = list.find((x) => !x.paid && (x.id === q || q.includes(x.kind) || q.includes(norm(x.provider)) || (q && norm(x.label.es).includes(q))))
+          || (q ? null : list.find((x) => !x.paid));
+        if (!b) return { status: "not_found", options: list.filter((x) => !x.paid).map((x) => x.label.en) };
+        if (b.amount > state.account.balance) return { status: "insufficient", balance: state.account.balance };
+        const cardId = hooks.card("bill_pay", { bid: b.id });
+        state.pending = { type: "bill", bid: b.id, amount: b.amount, cardId };
+        return { status: "ready", bill: b.label.en, provider: b.provider, amount_usd: b.amount, due: b.due.en, needs_confirmation: true };
+      },
+      // ── Recargas de celular ──
+      prepare_topup({ recipient, amount_usd } = {}) {
+        const r = resolveRecipient(state, recipient || "");
+        if (!r) return { status: "need_recipient", options: state.recipients.map((x) => tr(x.short, lang())) };
+        const amount = r2(Number(amount_usd || 0));
+        if (!amount) return { status: "need_amount", options_usd: [5, 10, 15, 20] };
+        const ph = (state.phones || {})[r.id] || { carrier: "Telcel", num: "••• 0000" };
+        const cardId = hooks.card("topup", { rid: r.id, amount, carrier: ph.carrier, num: ph.num });
+        state.pending = { type: "topup", rid: r.id, amount, carrier: ph.carrier, cardId };
+        return { status: "ready", recipient_id: r.id, carrier: ph.carrier, amount_usd: amount, receives_local: r2(amount * CONFIG.rates[r.country].rate), needs_confirmation: true };
+      },
       show_profile() {
         hooks.card("profile", {});
         return { name: state.user.name, phone: "+1 (713) 555-0142", member_since: "March 2025", card_last4: state.account.card && state.account.card.last4, recipients: state.recipients.length };
@@ -389,6 +422,22 @@
           hooks.card(done ? "loan_paid_off" : "installment_paid", {});
           return { status: done ? "paid_off" : "paid", paid: state.loan.paid, of: state.loan.n, balance: state.account.balance };
         }
+        if (p.type === "bill") {
+          const b = state.bills.find((x) => x.id === p.bid);
+          state.account.balance = r2(state.account.balance - p.amount); b.paid = true;
+          state.movements.unshift({ id: nextId("m"), kind: "out", title: { es: `${b.provider} · ${b.label.es}`, en: `${b.provider} · ${b.label.en}` }, date: { es: "Hoy", en: "Today" }, amount: -p.amount });
+          state.flags.bill = true;
+          hooks.card("bill_paid", { bid: b.id });
+          return { status: "paid", bill: b.label.en, balance: state.account.balance };
+        }
+        if (p.type === "topup") {
+          const r = state.recipients.find((x) => x.id === p.rid);
+          state.account.balance = r2(state.account.balance - p.amount);
+          state.movements.unshift({ id: nextId("m"), kind: "out", title: { es: `Recarga ${p.carrier} · ${tr(r.short, "es")}`, en: `${p.carrier} top-up · ${tr(r.short, "en")}` }, date: { es: "Hoy", en: "Today" }, amount: -p.amount });
+          state.flags.topup = true;
+          hooks.card("topup_done", { rid: p.rid, amount: p.amount, carrier: p.carrier });
+          return { status: "topped_up", recipient_id: p.rid, balance: state.account.balance };
+        }
         if (p.type === "deposit") {
           state.account.balance = r2(state.account.balance + p.amount);
           state.movements.unshift({ id: nextId("m"), kind: "in", title: { es: "Carga a tu cuenta", en: "Money added" }, date: { es: "Hoy", en: "Today" }, amount: p.amount });
@@ -426,7 +475,9 @@
     payLater: /\b(paga\w* despues|pago despues|pay later|envia\w* hoy|send now|a credito|fiado)\b/,
     loan: /\b(prestamo|credito|prestame|presta|prestas|adelanto|necesito dinero|me falta dinero|loan|borrow|lend|advance)\b/,
     send: /\b(envia\w*|envie\w*|enviar|mand\w*|transfer\w*|send|wire|remesa|deposit\w* a|pasale|pasar)\b/,
-    deposit: /\b(carga\w*|cargar|recarga\w* mi cuenta|meter dinero|mete\w* dinero|deposita\w* en mi|agrega\w* (dinero|saldo)|fondea\w*|add money|top up|load money|deposit)\b/,
+    bill: /\b(luz|agua|internet|cfe|siapa|telmex|recibo|servicio\w*|bill\w*|electric\w*|water)\b/,
+    topup: /\b(recarga\w*|tiempo aire|saldo (al|del|de su) cel\w*|top ?up|airtime)\b/,
+    deposit: /\b(carga\w*|cargar|recarga\w* mi cuenta|meter dinero|mete\w* dinero|deposita\w* en mi|agrega\w* (dinero|saldo)|fondea\w*|add money|load money|deposit)\b/,
     quote: /\b(cuanto (le )?(llega|recibe)|cuanto llegaria|calcula\w*|cotiza\w*|how much (would|does|will) (she|he|they|it) (get|receive)|quote)\b|\by si (mando|envio)\b/,
     profile: /\b(mi perfil|mis datos|perfil|profile|my info)\b/,
     product: /\b(que es|como funciona|cuentame (de|sobre)|tell me about|what is|how does)\b/,
@@ -462,8 +513,9 @@
           `Hi ${N()}, I'm Félix. I help you send money to your family. To start, who do you send money to, and what city do they live in?`);
       }
       ctx.awaiting = null;
-      return S(`Hola ${N()}, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?`,
-        `Hi ${N()}, I'm Félix. I can send money to your family, add money to your account, or send today so you pay later. What do you need?`);
+      const b = (state.bills || []).find((x) => !x.paid);
+      return S(`Hola ${N()}. Tienes ${money(state.account.balance, "es")} en tu cuenta.${b ? ` ${b.label.es} vence el ${b.due.es}. ¿La pagamos?` : " ¿Qué necesitas hoy?"}`,
+        `Hi ${N()}. You have ${money(state.account.balance, "en")} in your account.${b ? ` ${b.label.en} is due ${b.due.en}. Should we pay it?` : " What do you need today?"}`);
     }
 
     // ── Envío ──
@@ -543,6 +595,8 @@
       if (res.status === "sent") {
         return S(`Listo, ya va en camino a ${recName(res.recipient_id)}. Te aviso cuando llegue.`, `Done, it's on its way to ${recName(res.recipient_id)}. I'll let you know when it arrives.`);
       }
+      if (res.status === "paid" && res.bill) return S(`Listo, pagado. Te queda un saldo de ${usdSpoken(res.balance, "es")}.`, `Done, paid. Your balance is ${usdSpoken(res.balance, "en")}.`);
+      if (res.status === "topped_up") return S(`Listo, ya tiene saldo ${recName(res.recipient_id)}.`, `Done, ${recName(res.recipient_id)} has airtime now.`);
       if (res.status === "deposited") return S(`Listo. Tu saldo ahora es de ${usdSpoken(res.balance, "es")}.`, `Done. Your balance is now ${usdSpoken(res.balance, "en")}.`);
       if (res.status === "disbursed") return S(`Listo. Ya tienes ${usdSpoken(res.amount, "es")} en tu cuenta. Tu primer pago es el ${res.first_payment}. ¿Quieres enviarlo a alguien?`, `Done. You have ${usdSpoken(res.amount, "en")} in your account. Your first payment is ${res.first_payment}. Want to send it to someone?`);
       if (res.status === "paid") return S(`Pagado. Llevas ${res.paid} de ${res.of}. Te queda un saldo de ${usdSpoken(res.balance, "es")}.`, `Paid. That's ${res.paid} of ${res.of}. Your balance is ${usdSpoken(res.balance, "en")}.`);
@@ -658,6 +712,21 @@
         const a = parseAmount(t); const r = resolveRecipient(state, t);
         if (!a) { ctx.awaiting = "quote_amount"; ctx.draft = { rid: r ? r.id : null }; return S("¿Cuánto quieres calcular?", "How much should I calculate?"); }
         return tryQuote(a, r);
+      }
+      if (RX.topup.test(t) && !/mi cuenta/.test(t)) {
+        const r = resolveRecipient(state, t); const a = parseAmount(t);
+        const res = tools.prepare_topup({ recipient: r ? r.id : "", amount_usd: a ? a.value : 0 });
+        if (res.status === "need_recipient") return S(`¿A quién le recargo? Tienes a ${listNames()}.`, `Who should I top up? You have ${listNames()}.`);
+        if (res.status === "need_amount") { ctx.draft = { rid: r.id }; return S(`¿De cuánto la recarga a ${recName(r.id)}? Puede ser de 5, 10, 15 o 20 dólares.`, `How much for ${recName(r.id)}? 5, 10, 15 or 20 dollars.`); }
+        ctx.awaiting = "confirm";
+        return S(`Recargo ${usdSpoken(res.amount_usd, "es")} al ${res.carrier} de ${recName(res.recipient_id)}. ¿La hago?`, `I'll top up ${usdSpoken(res.amount_usd, "en")} to ${recName(res.recipient_id)}'s ${res.carrier}. Do it?`);
+      }
+      if (RX.bill.test(t) && !RX.send.test(t)) {
+        if (/\b(que|cuales|mis|ver|muestra|tengo)\b/.test(t) && !/\b(paga|pagar|pagala|pay)\b/.test(t)) { tools.show_bills(); return S("Estos son tus pagos pendientes.", "Here are your upcoming bills."); }
+        const res = tools.prepare_bill_payment({ bill: t });
+        if (res.status === "not_found") { tools.show_bills(); return S("¿Cuál quieres pagar?", "Which one do you want to pay?"); }
+        ctx.awaiting = "confirm";
+        return S(`Pago ${usdSpoken(res.amount_usd, "es")} de ${res.provider}, vence el ${state.bills.find((b) => b.provider === res.provider).due.es}. ¿Lo pago de tu saldo?`, `I'll pay ${usdSpoken(res.amount_usd, "en")} to ${res.provider}. Pay it from your balance?`);
       }
       if (RX.profile.test(t)) { tools.show_profile(); return S("Este es tu perfil.", "Here's your profile."); }
       if (RX.product.test(t)) { const res = tools.show_product({ product: t }); return S("Te dejo un resumen en pantalla. ¿Quieres usarlo ahora?", "Here's a summary on screen. Want to use it now?"); }
