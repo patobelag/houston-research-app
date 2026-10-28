@@ -88,7 +88,7 @@ check("ayuda por WhatsApp", /WhatsApp/.test(s.say("necesito ayuda")) && /abro Wh
 
 // 7b. Flujos del offsite: saludo, cargar billetera, calculadora, perfil, producto
 s = session("steady");
-check("saludo nombra 3 caminos", /cargar dinero/.test(s.brain.greet()) && /pagues después/.test(s.brain.greet()));
+check("saludo de compañero financiero", /1,240.35/.test(s.brain.greet()) && /Luz de Mamá/.test(s.brain.greet()), s.brain.greet());
 o = s.say("quiero cargar dinero a mi cuenta");
 check("carga pide monto", /Cuánto quieres cargar/.test(o), o);
 o = s.say("200");
@@ -102,6 +102,16 @@ check("calculadora a envío", /Lo envío/.test(o) && last(s) === "send", o);
 s = session("steady");
 check("perfil", s.say("muéstrame mi perfil") && last(s) === "profile");
 check("producto", s.say("¿cómo funciona paga después?") && last(s) === "product");
+
+// 7c. Compañero financiero: servicios y recargas
+s = session("steady");
+o = s.say("paga la luz de mi mamá");
+check("pago de luz listo", /50 dólares de CFE/.test(o) && last(s) === "bill_pay", o);
+o = s.say("sí"); check("luz pagada", /pagado/.test(o) && s.state.account.balance === 1190.35, o);
+o = s.say("¿qué servicios tengo pendientes?"); check("ver servicios", last(s) === "bills", o);
+o = s.say("recarga 10 dólares al cel de Ana");
+check("recarga lista", /AT&T/.test(o) && last(s) === "topup", o);
+o = s.say("dale"); check("recarga hecha", /saldo tu hermana|ya tiene saldo/.test(o) && last(s) === "topup_done", o);
 
 // 8. Onboarding
 s = session("new");
