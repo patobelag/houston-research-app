@@ -63,6 +63,13 @@
     }, 300);
   }
 
+  function fit() {
+    const wrap = document.getElementById("phone-wrap");
+    if (window.innerWidth <= 760) { wrap.style.removeProperty("--s"); return; }
+    const avail = window.innerHeight - document.querySelector(".bar").offsetHeight - 24;
+    wrap.style.setProperty("--s", Math.min(1, Math.max(0.6, avail / 844)).toFixed(3));
+  }
+  window.addEventListener("resize", fit); fit();
   frame.addEventListener("load", setup);
-  document.getElementById("reset").addEventListener("click", () => { started = false; frame.src = frame.src; });
+  document.getElementById("reset").addEventListener("click", () => { started = false; frame.src = "/voz"; });
 })();

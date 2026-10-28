@@ -1,7 +1,2 @@
-/* Contenedor del onboarding de Michu */
-.michu-wrap { display: flex; justify-content: center; align-items: center; min-height: 0; }
-#michu { width: 360px; height: 720px; border: 0; background: transparent; }
-@media (max-width: 760px) {
-  .stage { display: flex !important; justify-content: center; align-items: flex-start; padding-top: 8px !important; }
-  #michu { width: 100vw; height: calc(100vh - 60px); }
-}
+/* El onboarding de Michu va dentro de nuestro marco de teléfono */
+#michu { width: 100%; height: 100%; border: 0; display: block; background: #fefcf9; }
