@@ -11,7 +11,7 @@
     es: {
       scenario: "Inicio", newUser: "Nuevo usuario", steady: "Ya con cuenta", light: "Claro", dark: "Oscuro", voice: "Voz",
       demoVoice: "Navegador (demo)", phase2: "fase 2", reset: "Reiniciar",
-      tapToTalk: "Toca para hablar", listening: "Te escucho…", thinking: "Pensando…", speaking: "Toca para interrumpir",
+      tapToTalk: "Toca para hablar", listening: "Te escucho · toca para terminar", thinking: "Félix está pensando…", speaking: "Félix está hablando · toca para interrumpir",
       typeHere: "Escribe a Félix…", balance: "Saldo", today: "hoy", openFree: "Abre tu cuenta gratis",
       kb: "Teclado", mute: "Silencio", handsFree: "Manos libres", human: "Persona",
       noSR: "Tu navegador no reconoce voz. Escribe, o abre en Chrome o Safari.", micDenied: "Permite el micrófono para hablar con Félix.",
@@ -28,12 +28,12 @@
       elFail: "No pude conectar con ElevenLabs. Sigo con la voz del navegador.", elCode: "Este link necesita un código de acceso.",
       engEl: "Voz natural con ElevenLabs. Conversación continua: habla cuando quieras, interrumpe cuando quieras. Toca el círculo para terminar.",
       elEnded: "Conversación terminada",
-      ngTitle: "Antes de empezar, ¿cómo te llamas?", ngSub: "Félix te va a llamar por tu nombre durante la prueba.", ngBtn: "Empezar", ngPh: "Tu nombre",
+      ngTitle: "Antes de empezar, ¿cómo te llamas?", ngSub: "Félix te va a llamar por tu nombre durante la prueba.", ngBtn: "Empezar", ngPh: "Tu nombre", rgTitle: (n) => `Hola ${n}, Félix te va a hablar`, rgSub: "Sube el volumen de tu celular. Félix se presenta y te explica cómo usar la app.",
     },
     en: {
       scenario: "Start", newUser: "New user", steady: "Existing user", light: "Light", dark: "Dark", voice: "Voice",
       demoVoice: "Browser (demo)", phase2: "phase 2", reset: "Restart",
-      tapToTalk: "Tap to talk", listening: "Listening…", thinking: "Thinking…", speaking: "Tap to interrupt",
+      tapToTalk: "Tap to talk", listening: "Listening · tap when done", thinking: "Félix is thinking…", speaking: "Félix is talking · tap to interrupt",
       typeHere: "Type to Félix…", balance: "Balance", today: "today", openFree: "Open your free account",
       kb: "Keyboard", mute: "Mute", handsFree: "Hands-free", human: "Person",
       noSR: "This browser can't recognize speech. Type, or open it in Chrome or Safari.", micDenied: "Allow the microphone to talk to Félix.",
@@ -50,10 +50,10 @@
       elFail: "I couldn't connect to ElevenLabs. Using the browser voice.", elCode: "This link needs an access code.",
       engEl: "Natural voice with ElevenLabs. Continuous conversation: talk any time, interrupt any time. Tap the circle to end.",
       elEnded: "Conversation ended",
-      ngTitle: "Before we start, what's your name?", ngSub: "Félix will call you by your name during the test.", ngBtn: "Start", ngPh: "Your name",
+      ngTitle: "Before we start, what's your name?", ngSub: "Félix will call you by your name during the test.", ngBtn: "Start", ngPh: "Your name", rgTitle: (n) => `Hi ${n}, Félix is going to talk to you`, rgSub: "Turn up your volume. Félix introduces himself and explains how to use the app.",
     },
   };
-  const prefs = { scenario: "steady", lang: "es", theme: "light", engine: "demo", handsFree: true, muted: false, kb: false, captions: false };
+  const prefs = { scenario: "steady", lang: "es", theme: "light", engine: "demo", handsFree: false, muted: false, kb: false, captions: false };
   const t = (k) => UI[prefs.lang][k] || k;
   const S = (es, en) => (prefs.lang === "en" ? en : es);
   const tr = (v) => C.tr(v, prefs.lang);
@@ -81,6 +81,12 @@
     batt: '<rect x="2" y="7" width="18" height="10" rx="3"/><rect x="4" y="9" width="13" height="6" rx="1.5" fill="currentColor"/><path d="M22 10.5v3"/>',
   };
   const I = (n, s = 22, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
+
+  // ───────── Presentación de Félix (primera interacción) ─────────
+  let introDone = false;
+  const introText = () => S(
+    `Hola ${state.user.name}, soy Félix, tu asistente para mandar dinero a tu familia. Puedo enviar dinero, cargar dinero a tu cuenta, o enviar hoy y que pagues después. Para hablarme, toca el botón turquesa y habla. Cuando termines, tócalo otra vez y te respondo. ¿Qué quieres hacer?`,
+    `Hi ${state.user.name}, I'm Félix, your assistant for sending money to your family. I can send money, add money to your account, or send today so you pay later. To talk to me, tap the turquoise button and speak. When you're done, tap it again and I'll answer. What would you like to do?`);
 
   // ───────── Sesión ─────────
   let state, tools, brain, msgs, cards, timers, cardSeq = 0, turnCards = null, status = "idle", started = false, lastVia = null;
@@ -186,7 +192,7 @@
   function onOrb() {
     if (isEL()) {
       if (EL.connecting) return;
-      if (EL.active()) { EL.stop(); toast(t("elEnded")); } else EL.start();
+      if (EL.active()) EL.toggleMic(); else EL.start();
       return;
     }
     if (status === "speaking") { Voice.stopSpeaking(); setStatus("idle"); startListening(); return; }
@@ -240,7 +246,7 @@
           try { if (rec) rec.abort(); } catch (e) {}
           rec = new SR();
           rec.lang = lang === "en" ? "en-US" : "es-US";
-          rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+          rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
           let finalText = "", live = "", err = null;
           recResolve = resolve;
           rec.onresult = (e) => {
@@ -280,7 +286,7 @@
   // ───────── Voz ElevenLabs (Agents, WebRTC) ─────────
   const SDK_URL = "https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm";
   const EL = (() => {
-    let conv = null, mod = null, buf = [], flushT = 0, greeting = null, raf = 0, startedAt = 0;
+    let conv = null, mod = null, buf = [], flushT = 0, greeting = null, raf = 0, startedAt = 0, micOpen = false;
     const api = { connecting: false, lastTyped: null };
 
     function contextString() {
@@ -349,8 +355,9 @@
         if (!r.ok) throw new Error("token " + r.status);
         const { token } = await r.json();
         startedAt = Date.now();
-        const onlyGreeting = msgs.length === 1 && msgs[0].role === "felix";
-        greeting = onlyGreeting && !firstText ? msgs[0].text : null;
+        // Primera interacción: Félix se presenta. Después, no repite saludo.
+        greeting = !introDone && !firstText ? introText() : null;
+        introDone = true;
         conv = await mod.Conversation.startSession({
           conversationToken: token,
           connectionType: "webrtc",
@@ -369,7 +376,11 @@
               msgs.push({ role: "felix", text }); flush(); render();
             }
           },
-          onModeChange: (m) => { const mode = m && m.mode; if (mode === "speaking") setStatus("speaking"); else if (mode === "listening") setStatus("listening"); },
+          onModeChange: (m) => {
+            const mode = m && m.mode;
+            if (mode === "speaking") setStatus("speaking");
+            else if (mode === "listening") { if (micOpen) setStatus("listening"); else if (status === "speaking") setStatus("idle"); }
+          },
           onStatusChange: (s) => { if (s && s.status === "disconnected") api.cleanup(); },
           onDisconnect: (d) => {
             const early = Date.now() - startedAt < 4000;
@@ -379,8 +390,10 @@
           onError: (e) => { console.error("ElevenLabs", e); },
         });
         if (prefs.muted) { try { conv.setVolume({ volume: 0 }); } catch (e) {} }
+        // Push to talk: el micrófono arranca cerrado. Se abre al tocar el botón.
+        micOpen = false; try { conv.setMicMuted(true); } catch (e) {}
         api.connecting = false;
-        setStatus("listening");
+        setStatus(greeting ? "speaking" : "idle");
         levels();
         if (firstText) api.send(firstText);
       } catch (e) {
@@ -390,7 +403,15 @@
         setStatus("idle"); render();
       }
     };
-    api.cleanup = () => { flush(); conv = null; api.connecting = false; cancelAnimationFrame(raf); $("#orb").style.setProperty("--lvl", 0); if (status !== "idle") setStatus("idle"); };
+    // Toca para hablar / toca para terminar
+    api.toggleMic = () => {
+      if (!conv) return;
+      micOpen = !micOpen;
+      try { conv.setMicMuted(!micOpen); } catch (e) {}
+      setStatus(micOpen ? "listening" : "thinking");
+      if (!micOpen) setTimeout(() => { if (status === "thinking" && !micOpen) setStatus("idle"); }, 12000);
+    };
+    api.cleanup = () => { micOpen = false; flush(); conv = null; api.connecting = false; cancelAnimationFrame(raf); $("#orb").style.setProperty("--lvl", 0); if (status !== "idle") setStatus("idle"); };
     api.stop = () => { const c = conv; api.cleanup(); if (c) { try { c.endSession(); } catch (e) {} } };
     api.setMuted = (m) => { try { conv && conv.setVolume({ volume: m ? 0 : 1 }); } catch (e) {} };
     return api;
@@ -401,10 +422,9 @@
     status = s;
     const orb = $("#orb");
     orb.className = "orb " + s;
-    $("#orb-icon").innerHTML = s === "speaking" ? '<span class="bars"><i></i><i></i><i></i><i></i></span>' : s === "thinking" ? '<span class="tdots"><i></i><i></i><i></i></span>' : I("mic", 34, 2);
+    $("#orb-icon").innerHTML = s === "speaking" ? '<span class="bars"><i></i><i></i><i></i><i></i></span>' : s === "thinking" ? '<span class="tdots"><i></i><i></i><i></i></span>' : s === "listening" ? I("stop", 30, 2) : I("mic", 34, 2);
     orb.setAttribute("aria-label", s === "speaking" ? t("speaking") : t("tapToTalk"));
-    const el = isEL() && EL.active();
-    $("#hint").textContent = { idle: t("tapToTalk"), listening: el ? t("tapToEnd") : t("listening"), thinking: t("thinking"), speaking: el ? t("talkToInterrupt") : t("speaking") }[s];
+    $("#hint").textContent = { idle: t("tapToTalk"), listening: t("listening"), thinking: t("thinking"), speaking: t("speaking") }[s];
     renderChips();
   }
   function setCaption(html) { $("#caption").innerHTML = html; }
@@ -698,22 +718,39 @@
   if (q.get("theme") === "dark") prefs.theme = "dark";
   // Nombre del tester: se pregunta al inicio (o llega en el link con ?name=)
   function cleanName(v) { const n = String(v || "").trim().replace(/\s+/g, " ").slice(0, 24); return n ? n.charAt(0).toUpperCase() + n.slice(1) : ""; }
-  function showNameGate() {
+  // Pantalla inicial: pide el nombre (si no llegó) y el toque que necesita el navegador para hablar
+  function showNameGate(askName = true) {
     EL.stop(); Voice.stopAll(); setStatus("idle");
-    $("#ng-title").textContent = t("ngTitle"); $("#ng-sub").textContent = t("ngSub");
-    $("#ng-btn").textContent = t("ngBtn"); $("#ng-input").placeholder = t("ngPh");
-    $("#ng-input").value = prefs.userName || "";
+    const input = $("#ng-input");
+    input.hidden = !askName; input.required = askName;
+    $("#ng-title").textContent = askName ? t("ngTitle") : UI[prefs.lang].rgTitle(prefs.userName);
+    $("#ng-sub").textContent = askName ? t("ngSub") : t("rgSub");
+    $("#ng-btn").textContent = t("ngBtn"); input.placeholder = t("ngPh");
+    input.value = prefs.userName || "";
     $("#namegate").hidden = false;
-    setTimeout(() => $("#ng-input").focus(), 50);
+    if (askName) setTimeout(() => input.focus(), 50);
   }
-  $("#ng-form").addEventListener("submit", (e) => {
+  $("#ng-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const n = cleanName($("#ng-input").value);
-    if (!n) return;
-    prefs.userName = n;
+    if (!$("#ng-input").hidden) {
+      const n = cleanName($("#ng-input").value);
+      if (!n) return;
+      prefs.userName = n;
+    }
     $("#namegate").hidden = true;
+    introDone = false;
     resetSession();
+    startExperience();
   });
+  // Félix se presenta por voz (usa el toque de "Empezar" para poder sonar)
+  async function startExperience() {
+    try { await elCheck; } catch (e) {}
+    started = true;
+    if (isEL()) { EL.start(); return; }
+    introDone = true;
+    msgs = [{ role: "felix", text: introText() }]; render();
+    if (!prefs.muted) { setStatus("speaking"); Voice.speak(introText(), prefs.lang).then(() => { if (status === "speaking") setStatus("idle"); }); }
+  }
   prefs.userName = cleanName(q.get("name")) || null;
 
   if (q.get("code")) accessCode = q.get("code");
@@ -722,10 +759,11 @@
 
   resetSession();
   fit();
-  if (!prefs.userName && !(q.get("play") || window.__PLAY__)) showNameGate();
+  if (!(q.get("play") || window.__PLAY__)) showNameGate(!prefs.userName);
   // ¿Está configurado ElevenLabs en el servidor? Si sí, es el motor por defecto.
+  let elCheck = Promise.resolve();
   if (location.protocol.startsWith("http")) {
-    fetch("/api/el-token?check=1").then((r) => (r.ok ? r.json() : { configured: false })).then((j) => {
+    elCheck = fetch("/api/el-token?check=1").then((r) => (r.ok ? r.json() : { configured: false })).then((j) => {
       elReady = !!j.configured;
       if (elReady && q.get("engine") !== "demo") { prefs.engine = "eleven"; prefs.kb = false; }
       render(); setStatus(status);
