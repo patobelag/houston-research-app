@@ -1,6 +1,12 @@
 {
   "buildCommand": "node build.js",
   "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/voz", "destination": "https://houston-prototipos-app.vercel.app/voz/" },
+    { "source": "/voz/:path*", "destination": "https://houston-prototipos-app.vercel.app/voz/:path*" },
+    { "source": "/ds/:path*", "destination": "https://houston-prototipos-app.vercel.app/ds/:path*" },
+    { "source": "/assets/:path*", "destination": "https://houston-prototipos-app.vercel.app/assets/:path*" }
+  ],
   "headers": [
     { "source": "/(.*)", "headers": [
       { "key": "X-Robots-Tag", "value": "noindex" },
