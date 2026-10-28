@@ -353,7 +353,8 @@
           clientTools: clientTools(),
           onMessage: (m) => {
             const who = m.source || m.role;
-            const text = String(m.message || "").trim();
+            // Quita etiquetas de expresión de la voz, por ejemplo [happy]
+            const text = String(m.message || "").replace(/\[[a-z _-]{2,24}\]\s*/gi, "").trim();
             if (!text) return;
             if (who === "user") {
               if (api.lastTyped && api.lastTyped.trim() === text) { api.lastTyped = null; return; }
