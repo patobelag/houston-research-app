@@ -370,6 +370,7 @@
             const text = String(m.message || "").replace(/\[[a-z _-]{2,24}\]\s*/gi, "").trim();
             if (!text) return;
             if (who === "user") {
+              if (/^[.\s…]*$/.test(text)) return; // silencio: el micrófono estaba cerrado
               if (api.lastTyped && api.lastTyped.trim() === text) { api.lastTyped = null; return; }
               msgs.push({ role: "user", text, via: "voz" }); setCaption(""); render();
             } else {
