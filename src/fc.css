@@ -30,7 +30,7 @@
 
 /* Dock: Escribir + Hablar */
 .fc .dock { background: linear-gradient(to top, #0b2422 75%, transparent); }
-.fc .chips { justify-content: flex-end; }
+.fc .chips { justify-content: flex-end; flex-wrap: wrap; overflow: visible; }
 .fc .chip-b { background: rgba(255,255,255,.07); border-color: #2a4f4b; color: #f2fbf9; }
 .fc .chip-b.pri { background: #2feee4; border-color: #2feee4; color: #052e2c; }
 .fc #btn-mute, .fc #btn-human, .fc #btn-hf { display: none !important; }

@@ -375,7 +375,7 @@
               if (api.lastTyped && api.lastTyped.trim() === text) { api.lastTyped = null; return; }
               msgs.push({ role: "user", text, via: "voz" }); setCaption(""); render();
             } else {
-              if (greeting && text === greeting.trim()) { greeting = null; return; }
+              if (greeting && text === greeting.trim()) { greeting = null; if (!FC) return; }
               msgs.push({ role: "felix", text }); flush(); render();
             }
           },
