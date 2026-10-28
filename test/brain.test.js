@@ -82,7 +82,26 @@ check("descongelar", /funciona/.test(s.say("descongela mi tarjeta")) && !s.state
 check("saldo", /1,240.35/.test(s.say("¿cuánto tengo?")));
 check("tipo de cambio", /18.78/.test(s.say("¿a cómo está el dólar hoy?")));
 check("movimientos", last(s) === "rates" && /movimientos/.test(s.say("muéstrame mis movimientos")));
-check("persona", /Lucía/.test(s.say("quiero hablar con una persona")));
+check("persona pide canal", /WhatsApp/.test(s.say("quiero hablar con una persona")));
+check("persona en app", /Lucía/.test(s.say("aquí en la app")) && last(s) === "human");
+check("ayuda por WhatsApp", /WhatsApp/.test(s.say("necesito ayuda")) && /abro WhatsApp/.test(s.say("por WhatsApp")));
+
+// 7b. Flujos del offsite: saludo, cargar billetera, calculadora, perfil, producto
+s = session("steady");
+check("saludo nombra 3 caminos", /cargar dinero/.test(s.brain.greet()) && /pagues después/.test(s.brain.greet()));
+o = s.say("quiero cargar dinero a mi cuenta");
+check("carga pide monto", /Cuánto quieres cargar/.test(o), o);
+o = s.say("200");
+check("carga lista", /Cargo 200 dólares/.test(o) && last(s) === "deposit", o);
+o = s.say("sí");
+check("carga confirmada", /1,440.35/.test(o) && last(s) === "deposit_done", o);
+o = s.say("¿cuánto le llega a mi mamá si mando 200?");
+check("calculadora", /3,756 pesos/.test(o) && last(s) === "quote", o);
+o = s.say("sí, mándalo");
+check("calculadora a envío", /Lo envío/.test(o) && last(s) === "send", o);
+s = session("steady");
+check("perfil", s.say("muéstrame mi perfil") && last(s) === "profile");
+check("producto", s.say("¿cómo funciona paga después?") && last(s) === "product");
 
 // 8. Onboarding
 s = session("new");
