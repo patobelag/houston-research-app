@@ -49,11 +49,12 @@
   const REL = Object.fromEntries(RELATIONS.map((r) => [r.key, r]));
 
   // ───────────────────────── Estado inicial ─────────────────────────
-  function seedState(scenario) {
+  function seedState(scenario, name) {
+    const userName = (name || "Juan").trim() || "Juan";
     const base = { scenario, pending: null, transfers: {}, seq: 1, onb: null, flags: {} };
     if (scenario === "new") {
       return Object.assign(base, {
-        user: { name: "Juan" },
+        user: { name: userName },
         account: { open: false, balance: 0, card: null },
         credit: { limit: 150, used: 0 },
         loan: null,
@@ -64,7 +65,7 @@
       });
     }
     return Object.assign(base, {
-      user: { name: "Juan" },
+      user: { name: userName },
       account: { open: true, balance: 1240.35, card: { last4: "4821", frozen: false } },
       credit: { limit: 500, used: 0 },
       loan: { amount: 200, n: 4, paid: 2, installment: 50, due: { es: "jueves 30 de octubre", en: "Thursday, October 30" } },
@@ -395,6 +396,7 @@
     const ctx = { awaiting: null, draft: {} };
     const lg = () => getLang();
     const S = (es, en) => L(lg(), es, en);
+    const N = () => state.user.name;
     const recName = (rid) => { const r = state.recipients.find((x) => x.id === rid); if (!r) return ""; return REL[r.rel] ? REL[r.rel].poss[lg()] : r.name; };
     const recShort = (rid) => { const r = state.recipients.find((x) => x.id === rid); return r ? tr(r.short, lg()) : ""; };
     const listNames = () => { const n = state.recipients.map((r) => tr(r.short, lg())); return n.length <= 1 ? n.join("") : n.slice(0, -1).join(", ") + S(" o ", " or ") + n[n.length - 1]; };
@@ -402,15 +404,15 @@
     function greet() {
       if (state.scenario === "new" && !state.account.open) {
         ctx.awaiting = "onb_recipient";
-        return S("Hola Juan, soy Félix. Te ayudo a mandarle dinero a tu familia. Para empezar, ¿a quién le envías dinero y en qué ciudad vive?",
-          "Hi Juan, I'm Félix. I help you send money to your family. To start, who do you send money to, and what city do they live in?");
+        return S(`Hola ${N()}, soy Félix. Te ayudo a mandarle dinero a tu familia. Para empezar, ¿a quién le envías dinero y en qué ciudad vive?`,
+          `Hi ${N()}, I'm Félix. I help you send money to your family. To start, who do you send money to, and what city do they live in?`);
       }
       ctx.awaiting = null;
       if (state.loan && state.loan.paid < state.loan.n) {
-        return S(`Hola Juan. Tu cuota de ${usdSpoken(state.loan.installment, "es")} vence el ${state.loan.due.es}. ¿Qué hacemos hoy?`,
-          `Hi Juan. Your ${usdSpoken(state.loan.installment, "en")} payment is due ${state.loan.due.en}. What do you need today?`);
+        return S(`Hola ${N()}. Tu cuota de ${usdSpoken(state.loan.installment, "es")} vence el ${state.loan.due.es}. ¿Qué hacemos hoy?`,
+          `Hi ${N()}. Your ${usdSpoken(state.loan.installment, "en")} payment is due ${state.loan.due.en}. What do you need today?`);
       }
-      return S("Hola Juan, ¿qué necesitas hoy?", "Hi Juan, what do you need today?");
+      return S(`Hola ${N()}, ¿qué necesitas hoy?`, `Hi ${N()}, what do you need today?`);
     }
 
     // ── Envío ──
@@ -592,7 +594,7 @@
       if (RX.card.test(t)) { const res = tools.show_card(); return res.status === "no_card" ? S("Aún no tienes tarjeta. Primero abrimos tu cuenta.", "No card yet. Let's open your account first.") : S(`Tu tarjeta de débito termina en ${res.last4} y está ${res.frozen ? "congelada" : "activa"}.`, `Your debit card ends in ${res.last4} and it's ${res.frozen ? "frozen" : "active"}.`); }
       if (recAny && !amtAny) { ctx.draft = { rid: recAny.id }; return trySend(); }
       if (amtAny && ctx.awaiting === null && ctx.draft.rid) { ctx.draft.amount = amtAny.value; ctx.draft.currency = amtAny.currency; return trySend(); }
-      if (RX.thanks.test(t)) return S("Con gusto, Juan.", "Anytime, Juan.");
+      if (RX.thanks.test(t)) return S(`Con gusto, ${N()}.`, `Anytime, ${N()}.`);
       if (RX.greet.test(t)) return greet();
       if (RX.help.test(t)) return S("Puedo enviar dinero a tu familia, decirte el tipo de cambio, mostrar tu saldo, pagar tu préstamo, darte un crédito pequeño o congelar tu tarjeta. Dime qué necesitas.", "I can send money to your family, tell you the exchange rate, show your balance, pay your loan, give you a small loan or freeze your card. Tell me what you need.");
       if (state.pending && RX.yes.test(t)) return confirm();

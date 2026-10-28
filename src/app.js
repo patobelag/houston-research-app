@@ -28,6 +28,7 @@
       elFail: "No pude conectar con ElevenLabs. Sigo con la voz del navegador.", elCode: "Este link necesita un código de acceso.",
       engEl: "Voz natural con ElevenLabs. Conversación continua: habla cuando quieras, interrumpe cuando quieras. Toca el círculo para terminar.",
       elEnded: "Conversación terminada",
+      ngTitle: "Antes de empezar, ¿cómo te llamas?", ngSub: "Félix te va a llamar por tu nombre durante la prueba.", ngBtn: "Empezar", ngPh: "Tu nombre",
     },
     en: {
       scenario: "Start", newUser: "New user", steady: "Existing user", light: "Light", dark: "Dark", voice: "Voice",
@@ -49,9 +50,10 @@
       elFail: "I couldn't connect to ElevenLabs. Using the browser voice.", elCode: "This link needs an access code.",
       engEl: "Natural voice with ElevenLabs. Continuous conversation: talk any time, interrupt any time. Tap the circle to end.",
       elEnded: "Conversation ended",
+      ngTitle: "Before we start, what's your name?", ngSub: "Félix will call you by your name during the test.", ngBtn: "Start", ngPh: "Your name",
     },
   };
-  const prefs = { scenario: "steady", lang: "es", theme: "light", engine: "demo", handsFree: true, muted: false, kb: false };
+  const prefs = { scenario: "steady", lang: "es", theme: "light", engine: "demo", handsFree: true, muted: false, kb: false, captions: false };
   const t = (k) => UI[prefs.lang][k] || k;
   const S = (es, en) => (prefs.lang === "en" ? en : es);
   const tr = (v) => C.tr(v, prefs.lang);
@@ -103,7 +105,7 @@
     timers = []; msgs = []; cards = {}; started = false;
     Voice.stopAll();
     EL.stop();
-    state = C.seedState(prefs.scenario);
+    state = C.seedState(prefs.scenario, prefs.userName);
     tools = C.makeTools(state, hooks);
     brain = C.makeBrain(state, tools, () => prefs.lang);
     msgs.push({ role: "felix", text: brain.greet() });
@@ -436,11 +438,11 @@
   function renderTop() {
     const a = state.account;
     const r = C.CONFIG.rates.MX;
-    $("#top").innerHTML = `<div class="avatar">J</div>` +
+    $("#top").innerHTML = `<button class="avatar" id="btn-name" title="${S("Cambiar nombre", "Change name")}">${esc(state.user.name.charAt(0).toUpperCase())}</button>` +
       (a.open
         ? `<button class="pill" data-say="${esc(S("¿Cuánto tengo?", "How much do I have?"))}"><small>${t("balance")}</small><b>${money(a.balance)}</b></button>`
         : `<span class="pill mute">${t("openFree")}</span>`) +
-      `<span class="spacer"></span><button class="pill rate" data-say="${esc(S("¿A cómo está el dólar?", "What's the dollar at?"))}"><small>MXN ${t("today")}</small><b>$${r.rate}</b></button>`;
+      `<span class="spacer"></span><button class="cc ${prefs.captions ? "on" : ""}" id="btn-cc" title="${S("Subtítulos", "Captions")}">CC</button><button class="pill rate" data-say="${esc(S("¿A cómo está el dólar?", "What's the dollar at?"))}"><small>MXN ${t("today")}</small><b>$${r.rate}</b></button>`;
   }
 
   function renderConvo() {
@@ -449,7 +451,12 @@
     const lastF = msgs.map((m) => m.role).lastIndexOf("felix");
     const html = ['<div class="spacer-top"></div>'];
     msgs.forEach((m, i) => {
-      if (m.role === "felix") html.push(`<div class="m-f ${i === lastF ? "latest" : ""}">${esc(m.text)}</div>`);
+      if (m.role === "felix") {
+        // El saludo inicial siempre se ve. Lo demás que dice Félix solo con subtítulos (CC) activos.
+        if (i === 0) html.push(`<div class="m-f greet">${esc(m.text)}</div>`);
+        else if (prefs.captions || prefs.muted) html.push(`<div class="m-f ${i === lastF ? "latest" : ""}">${esc(m.text)}</div>`);
+        else html.push(`<span hidden></span>`);
+      }
       else if (m.role === "user") html.push(`<div class="m-u">${esc(m.text)}${m.via === "voz" ? `<span class="via">${I("mic", 10, 2.4)} ${S("por voz", "by voice")}</span>` : ""}</div>`);
       else if (m.role === "card" && cards[m.id]) html.push(cardHTML(cards[m.id]));
     });
@@ -507,7 +514,7 @@
     return `<div class="acts"><button class="btn sec" data-say="${esc(t("sayCancel"))}">${esc(noLabel || t("cancel"))}</button><button class="btn pri" data-say="${esc(t("sayConfirm"))}">${esc(okLabel || t("confirm"))}</button></div>`;
   }
   function dcardHTML(last4, frozen) {
-    return `<div class="dcard ${frozen ? "frozen" : ""}"><span class="glow"></span><div style="display:flex;justify-content:space-between;align-items:center"><span class="brand">Félix</span><span style="font-size:11px;opacity:.8">${S("Débito", "Debit")}</span></div><span class="chip"></span><div class="num">•••• •••• •••• ${last4}</div><div class="ft"><span>JUAN HERNÁNDEZ</span><span class="visa">VISA</span></div>${frozen ? `<div class="ice"><div style="display:grid;place-items:center;gap:4px">${I("snow", 26, 2)}${S("Congelada", "Frozen")}</div></div>` : ""}</div>`;
+    return `<div class="dcard ${frozen ? "frozen" : ""}"><span class="glow"></span><div style="display:flex;justify-content:space-between;align-items:center"><span class="brand">Félix</span><span style="font-size:11px;opacity:.8">${S("Débito", "Debit")}</span></div><span class="chip"></span><div class="num">•••• •••• •••• ${last4}</div><div class="ft"><span>${esc(state.user.name.toUpperCase())}</span><span class="visa">VISA</span></div>${frozen ? `<div class="ice"><div style="display:grid;place-items:center;gap:4px">${I("snow", 26, 2)}${S("Congelada", "Frozen")}</div></div>` : ""}</div>`;
   }
   function cardHTML(c) {
     const d = c.data, cls = `card ${c.resolved ? "resolved-" + c.resolved : ""}`;
@@ -624,6 +631,8 @@
   document.addEventListener("click", (e) => {
     const say = e.target.closest("[data-say]");
     if (say) { userSays(say.dataset.say, "tap"); return; }
+    if (e.target.closest("#btn-cc")) { prefs.captions = !prefs.captions; render(); return; }
+    if (e.target.closest("#btn-name")) { showNameGate(); return; }
     const tst = e.target.closest("[data-toast]");
     if (tst) { toast(t(tst.dataset.toast)); return; }
     const seg = e.target.closest(".seg button");
@@ -650,12 +659,33 @@
   if (q.get("s") === "new" || q.get("s") === "steady") prefs.scenario = q.get("s");
   if (q.get("lang") === "en") prefs.lang = "en";
   if (q.get("theme") === "dark") prefs.theme = "dark";
+  // Nombre del tester: se pregunta al inicio (o llega en el link con ?name=)
+  function cleanName(v) { const n = String(v || "").trim().replace(/\s+/g, " ").slice(0, 24); return n ? n.charAt(0).toUpperCase() + n.slice(1) : ""; }
+  function showNameGate() {
+    EL.stop(); Voice.stopAll(); setStatus("idle");
+    $("#ng-title").textContent = t("ngTitle"); $("#ng-sub").textContent = t("ngSub");
+    $("#ng-btn").textContent = t("ngBtn"); $("#ng-input").placeholder = t("ngPh");
+    $("#ng-input").value = prefs.userName || "";
+    $("#namegate").hidden = false;
+    setTimeout(() => $("#ng-input").focus(), 50);
+  }
+  $("#ng-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const n = cleanName($("#ng-input").value);
+    if (!n) return;
+    prefs.userName = n;
+    $("#namegate").hidden = true;
+    resetSession();
+  });
+  prefs.userName = cleanName(q.get("name")) || null;
+
   if (q.get("code")) accessCode = q.get("code");
   if (q.get("engine") === "demo") prefs.engine = "demo";
   if (!Voice.canListen) prefs.kb = true;
 
   resetSession();
   fit();
+  if (!prefs.userName && !(q.get("play") || window.__PLAY__)) showNameGate();
   // ¿Está configurado ElevenLabs en el servidor? Si sí, es el motor por defecto.
   if (location.protocol.startsWith("http")) {
     fetch("/api/el-token?check=1").then((r) => (r.ok ? r.json() : { configured: false })).then((j) => {
