@@ -286,7 +286,8 @@
   // ───────── Voz ElevenLabs (Agents, WebRTC) ─────────
   const SDK_URL = "https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm";
   const EL = (() => {
-    let conv = null, mod = null, buf = [], flushT = 0, greeting = null, raf = 0, startedAt = 0, micOpen = false;
+    let conv = null, mod = null, buf = [], flushT = 0, greeting = null, raf = 0, startedAt = 0, micOpen = false, muteT = 0;
+    function enforceMute() { if (conv && !micOpen) { try { const r = conv.setMicMuted(true); if (r && r.catch) r.catch(() => {}); } catch (e) {} } }
     const api = { connecting: false, lastTyped: null };
 
     function contextString() {
@@ -378,6 +379,7 @@
           },
           onModeChange: (m) => {
             const mode = m && m.mode;
+            enforceMute();
             if (mode === "speaking") setStatus("speaking");
             else if (mode === "listening") { if (micOpen) setStatus("listening"); else if (status === "speaking") setStatus("idle"); }
           },
@@ -391,7 +393,10 @@
         });
         if (prefs.muted) { try { conv.setVolume({ volume: 0 }); } catch (e) {} }
         // Push to talk: el micrófono arranca cerrado. Se abre al tocar el botón.
-        micOpen = false; try { conv.setMicMuted(true); } catch (e) {}
+        micOpen = false; enforceMute();
+        // El micrófono de WebRTC se publica unos instantes después de conectar: reforzamos el silencio
+        [300, 1000, 2500].forEach((ms) => setTimeout(enforceMute, ms));
+        clearInterval(muteT); muteT = setInterval(enforceMute, 1500);
         api.connecting = false;
         setStatus(greeting ? "speaking" : "idle");
         levels();
@@ -411,7 +416,7 @@
       setStatus(micOpen ? "listening" : "thinking");
       if (!micOpen) setTimeout(() => { if (status === "thinking" && !micOpen) setStatus("idle"); }, 12000);
     };
-    api.cleanup = () => { micOpen = false; flush(); conv = null; api.connecting = false; cancelAnimationFrame(raf); $("#orb").style.setProperty("--lvl", 0); if (status !== "idle") setStatus("idle"); };
+    api.cleanup = () => { micOpen = false; clearInterval(muteT); flush(); conv = null; api.connecting = false; cancelAnimationFrame(raf); $("#orb").style.setProperty("--lvl", 0); if (status !== "idle") setStatus("idle"); };
     api.stop = () => { const c = conv; api.cleanup(); if (c) { try { c.endSession(); } catch (e) {} } };
     api.setMuted = (m) => { try { conv && conv.setVolume({ volume: m ? 0 : 1 }); } catch (e) {} };
     return api;
