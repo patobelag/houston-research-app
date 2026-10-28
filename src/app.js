@@ -25,7 +25,7 @@
       sayConfirm: "Sí, confirmo", sayCancel: "Cancelar", shared: "Comprobante copiado",
       share: "Compartir comprobante", waOpen: "En la prueba real se abriría WhatsApp", openAcc: "Abrir mi cuenta", notNow: "Ahora no",
       elNotSet: "sin configurar", connecting: "Conectando con Félix…", tapToEnd: "Te escucho · toca para terminar", talkToInterrupt: "Habla para interrumpirlo",
-      elFail: "No pude conectar con ElevenLabs. Sigo con la voz del navegador.", elCode: "Este link necesita un código de acceso.",
+      elFail: "Félix no pudo conectarse a ElevenLabs (revisa los créditos). Sigo con la voz del navegador.", elCode: "Este link necesita un código de acceso.",
       engEl: "Voz natural con ElevenLabs. Toca para hablar y toca otra vez para que Félix responda.",
       elEnded: "Conversación terminada",
       ngTitle: "Antes de empezar, ¿cómo te llamas?", ngSub: "Félix te va a llamar por tu nombre durante la prueba.", ngBtn: "Empezar", ngPh: "Tu nombre", rgTitle: (n) => `Hola ${n}, Félix te va a hablar`, rgSub: "Sube el volumen de tu celular. Félix se presenta y te explica cómo usar la app.",
@@ -388,7 +388,13 @@
           onDisconnect: (d) => {
             const early = Date.now() - startedAt < 4000;
             api.cleanup();
-            if (early) { console.error("ElevenLabs desconectó al inicio", d); toast(t("elFail")); }
+            if (early) {
+              // Normalmente: sin créditos en ElevenLabs. Seguimos con la voz del navegador para no frenar la prueba.
+              console.error("ElevenLabs desconectó al inicio", d);
+              toast(t("elFail")); prefs.engine = "demo"; render();
+              const intro = introText(); msgs.push({ role: "felix", text: intro }); render();
+              if (!prefs.muted) { setStatus("speaking"); Voice.speak(intro, prefs.lang).then(() => { if (status === "speaking") setStatus("idle"); }); }
+            }
           },
           onError: (e) => { console.error("ElevenLabs", e); },
         });
