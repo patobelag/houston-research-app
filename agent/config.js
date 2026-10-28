@@ -110,7 +110,7 @@ function agentBody({ toolIds, inlineTools } = {}) {
         prompt,
       },
       tts: { voice_id: VOICE_ID, expressive_mode: false },
-      turn: { turn_eagerness: "normal" },
+      turn: { turn_eagerness: "patient" }, // push to talk: espera a que la persona toque "terminar"
       conversation: { max_duration_seconds: 600 },
     },
   };
