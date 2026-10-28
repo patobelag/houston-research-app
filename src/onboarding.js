@@ -23,7 +23,9 @@
     if (sent) return; sent = true;
     const p = new URLSearchParams();
     if (q.get("code")) p.set("code", q.get("code"));
-    p.set("name", (name || "Juan").trim().split(" ")[0]);
+    // Solo pasamos el nombre si la persona lo escribió (Crear cuenta).
+    // En Ingresar o WhatsApp no hay nombre: el home de voz lo pregunta antes de empezar.
+    if (name.trim()) p.set("name", name.trim().split(" ")[0]);
     location.href = "/?" + p.toString();
   }
 
@@ -55,8 +57,6 @@
       if (onb) {
         started = true;
         // Toma el nombre si ya aparece en pantalla ("Listo, Ana." o "Hola de nuevo, Ana.")
-        const m = (onb.innerText || "").match(/(?:Listo|Hola de nuevo),\s+([A-Za-zÁÉÍÓÚÑáéíóúñü]+)/);
-        if (m && !name) name = m[1];
       }
       // Terminó el onboarding o el login: ya no hay pantalla de onboarding ni de bloqueo
       if (started && !onb && !lock) goHome();
@@ -71,5 +71,5 @@
   }
   window.addEventListener("resize", fit); fit();
   frame.addEventListener("load", setup);
-  document.getElementById("reset").addEventListener("click", () => { started = false; frame.src = "/voz"; });
+  document.getElementById("reset").addEventListener("click", () => { started = false; name = q.get("name") || ""; frame.src = "/voz"; });
 })();
