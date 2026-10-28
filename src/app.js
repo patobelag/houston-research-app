@@ -519,6 +519,7 @@
     const turnCards = msgs.slice(lastU + 1).filter((m) => m.role === "card" && cards[m.id]);
     const card = turnCards.length ? cards[turnCards[turnCards.length - 1].id] : null;
     const you = lastU > lastF ? msgs[lastU].text : "";
+    $("#screen").classList.toggle("has-card", !!card);
     const key = [lastF, lastU, card ? card.id + (card.resolved || "") + JSON.stringify(state.transfers) : "", status === "listening"].join("|");
     if (el.dataset.k === key) return;
     el.dataset.k = key;
