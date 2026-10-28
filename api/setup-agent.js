@@ -40,10 +40,17 @@ module.exports = async (req, res) => {
 
   // 2. Crear o actualizar el agente
   const existing = process.env.ELEVENLABS_AGENT_ID;
-  const r = existing
+  let r = existing
     ? await call(`/v1/convai/agents/${encodeURIComponent(existing)}`, "PATCH", key, body)
     : await call("/v1/convai/agents/create", "POST", key, body);
 
+  // Si ElevenLabs no acepta turn_timeout -1 (sin re-enganche), probamos con el máximo común (30 s)
+  if (!r.ok && /turn_timeout/i.test(r.text)) {
+    body.conversation_config.turn.turn_timeout = 30;
+    r = existing
+      ? await call(`/v1/convai/agents/${encodeURIComponent(existing)}`, "PATCH", key, body)
+      : await call("/v1/convai/agents/create", "POST", key, body);
+  }
   if (!r.ok) {
     return res.status(502).json({ error: "ElevenLabs rechazó la configuración", status: r.status, detail: r.text, toolsError });
   }
@@ -54,6 +61,7 @@ module.exports = async (req, res) => {
     agent_id: agentId,
     voice_id: VOICE_ID,
     llm: LLM,
+    turn_timeout: body.conversation_config.turn.turn_timeout,
     tools: toolsError ? "inline" : toolIds.length,
     next: existing
       ? "Agente actualizado. No tienes que hacer nada más."
