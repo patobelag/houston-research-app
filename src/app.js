@@ -498,7 +498,7 @@
     const groups = [
       [S("1 · Remesa con calculadora", "1 · Remittance + calculator"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does my mom get if I send $200?"), S("¿Y si mando 300?", "And if I send $300?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100")]],
       [S("2 · Cargar dinero", "2 · Add money"), [S("Quiero cargar 200 dólares a mi cuenta", "I want to add $200 to my account")]],
-      [S("3 · Envía hoy, paga después", "3 · Send now, pay later"), [S("Mándale 1,500 a mi papá", "Send my dad $1,500"), S("Envía hoy y paga después 150 a mi tío Carlos", "Send now, pay later $150 to Uncle Carlos")]],
+      [S("3 · Envía hoy, paga después", "3 · Send now, pay later"), [S("Mándale 300 a mi papá y lo pago después", "Send my dad $300 and I'll pay later"), S("Envía hoy y paga después 150 a mi tío Carlos", "Send now, pay later $150 to Uncle Carlos")]],
       [S("Acciones simples", "Simple actions"), [S("Quiero hablar con alguien", "I want to talk to someone"), S("Muéstrame mi perfil", "Show my profile"), S("¿Cómo funciona paga después?", "How does pay later work?")]],
     ];
     $("#side-left").innerHTML = `<h3>${t("tryTitle")}</h3>` + groups.map(([g, xs]) => `<div class="tg">${g}</div><div class="try">${xs.map((x) => `<div class="tr">“${esc(x)}”</div>`).join("")}</div>`).join("");

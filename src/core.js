@@ -423,7 +423,7 @@
     card: /\b(tarjeta|card)\b/,
     movements: /\b(movimientos|historial|actividad|transacciones|ultimos gastos|activity|transactions|history)\b/,
     installment: /\b((pag\w*|abon\w*|pay)\b.*\b(prestamo|cuota|loan|installment|credito|mensualidad|lo que debo))|\b(mi cuota|my installment|lo que debo|what i owe)\b/,
-    payLater: /\b(paga\w* despues|pay later|envia\w* hoy|send now|a credito|fiado)\b/,
+    payLater: /\b(paga\w* despues|pago despues|pay later|envia\w* hoy|send now|a credito|fiado)\b/,
     loan: /\b(prestamo|credito|prestame|presta|prestas|adelanto|necesito dinero|me falta dinero|loan|borrow|lend|advance)\b/,
     send: /\b(envia\w*|envie\w*|enviar|mand\w*|transfer\w*|send|wire|remesa|deposit\w* a|pasale|pasar)\b/,
     deposit: /\b(carga\w*|cargar|recarga\w* mi cuenta|meter dinero|mete\w* dinero|deposita\w* en mi|agrega\w* (dinero|saldo)|fondea\w*|add money|top up|load money|deposit)\b/,
