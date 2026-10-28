@@ -17,8 +17,8 @@
       noSR: "Tu navegador no reconoce voz. Escribe, o abre en Chrome o Safari.", micDenied: "Permite el micrófono para hablar con Félix.",
       noSpeech: "No te escuché. Toca y habla de nuevo.", hfOn: "Manos libres: Félix escucha después de hablar", hfOff: "Manos libres apagado",
       muteOn: "Félix en silencio. Lee los subtítulos.", muteOff: "Félix habla en voz alta",
-      tryTitle: "Guion de prueba (el usuario lo dice en voz)", engineTitle: "Motor de voz", tips: "Cómo probar",
-      tipsBody: "Prototipo solo voz: no hay teclado ni botones de texto. Toca el círculo una vez y habla. Félix contesta con voz y muestra tarjetas de resumen. Para interrumpirlo, habla. Para terminar, toca el círculo.",
+      tryTitle: "Prueba decir", engineTitle: "Motor de voz", tips: "Cómo probar",
+      tipsBody: "Voz primero: toca el círculo una vez y habla. Félix contesta con voz y muestra tarjetas de resumen. Para interrumpirlo, habla. Si prefieres, toca el teclado para escribir o usa las sugerencias. Para terminar, toca el círculo.",
       engDemo: "Voz del navegador. Sirve para probar flujos. La voz natural llega con ElevenLabs en la fase 2.",
       srOk: "Reconocimiento de voz disponible", srNo: "Sin reconocimiento de voz en este navegador",
       confirm: "Confirmar", cancel: "Cancelar", done: "Hecho", cancelled: "Cancelado",
@@ -39,8 +39,8 @@
       noSR: "This browser can't recognize speech. Type, or open it in Chrome or Safari.", micDenied: "Allow the microphone to talk to Félix.",
       noSpeech: "I didn't hear you. Tap and talk again.", hfOn: "Hands-free: Félix listens after speaking", hfOff: "Hands-free off",
       muteOn: "Félix muted. Read the captions.", muteOff: "Félix speaks out loud",
-      tryTitle: "Test script (the user says it out loud)", engineTitle: "Voice engine", tips: "How to test",
-      tipsBody: "Voice-only prototype: no keyboard or text buttons. Tap the circle once and talk. Félix answers out loud and shows summary cards. Talk to interrupt. Tap the circle to end.",
+      tryTitle: "Try saying", engineTitle: "Voice engine", tips: "How to test",
+      tipsBody: "Voice first: tap the circle once and talk. Félix answers out loud and shows summary cards. Talk to interrupt. If you prefer, tap the keyboard to type or use the suggestions. Tap the circle to end.",
       engDemo: "Browser voice. Good for testing flows. The natural voice arrives with ElevenLabs in phase 2.",
       srOk: "Speech recognition available", srNo: "No speech recognition in this browser",
       confirm: "Confirm", cancel: "Cancel", done: "Done", cancelled: "Cancelled",
@@ -485,11 +485,13 @@
     if (aw === "send_amount") return [["$50"], ["$100"], ["$200"], [S("2,000 pesos", "2,000 pesos")]];
     if (aw === "loan_amount") return [["$100"], ["$200"], ["$300"]];
     if (!state.account.open) return [];
-    return [[S("Mándale $100 a mi mamá", "Send Mom $100")], [S("¿A cómo está el dólar?", "What's the dollar at?")], [S("Paga mi cuota", "Pay my installment")], [S("Necesito un préstamo de $200", "I need a $200 loan")], [S("Congela mi tarjeta", "Freeze my card")]];
+    if (aw === "after_quote") return [[S("Sí, envíalo", "Yes, send it"), true], [S("¿Y si mando 300?", "And if I send $300?")]];
+    if (aw === "deposit_amount") return [["$50"], ["$100"], ["$200"]];
+    if (aw === "human_channel") return [[S("Aquí en la app", "Here in the app")], ["WhatsApp"]];
+    return [[S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?")], [S("Mándale $100 a mi mamá", "Send Mom $100")], [S("Quiero cargar dinero", "I want to add money")], [S("Envía hoy y paga después", "Send now, pay later")]];
   }
   function renderChips() {
     const el = $("#chips");
-    el.innerHTML = ""; return; // prototipo solo voz: sin chips de texto
     if (!brain || status === "listening" || status === "thinking") { el.innerHTML = ""; return; }
     el.innerHTML = chipList().map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");
   }
@@ -501,7 +503,7 @@
       [S("3 · Envía hoy, paga después", "3 · Send now, pay later"), [S("Mándale 300 a mi papá y lo pago después", "Send my dad $300 and I'll pay later"), S("Envía hoy y paga después 150 a mi tío Carlos", "Send now, pay later $150 to Uncle Carlos")]],
       [S("Acciones simples", "Simple actions"), [S("Quiero hablar con alguien", "I want to talk to someone"), S("Muéstrame mi perfil", "Show my profile"), S("¿Cómo funciona paga después?", "How does pay later work?")]],
     ];
-    $("#side-left").innerHTML = `<h3>${t("tryTitle")}</h3>` + groups.map(([g, xs]) => `<div class="tg">${g}</div><div class="try">${xs.map((x) => `<div class="tr">“${esc(x)}”</div>`).join("")}</div>`).join("");
+    $("#side-left").innerHTML = `<h3>${t("tryTitle")}</h3>` + groups.map(([g, xs]) => `<div class="tg">${g}</div><div class="try">${xs.map((x) => `<div class="tr" data-say="${esc(x)}">“${esc(x)}”</div>`).join("")}</div>`).join("");
     $("#side-right").innerHTML = `<h3>${t("tips")}</h3><p style="margin-bottom:22px">${t("tipsBody")}</p>
       <h3>${t("engineTitle")}</h3>
       ${isEL() ? `<div class="status-line"><span class="dot"></span>ElevenLabs</div><p>${t("engEl")}</p>`
