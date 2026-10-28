@@ -250,7 +250,7 @@
         const receive = r2(amount * CONFIG.rates[r.country].rate);
         const cardId = hooks.card("paylater", { rid: r.id, amount, receive, plan, shortfall: _short ? r2(amount + CONFIG.fee - state.account.balance) : 0 });
         state.pending = { type: "paylater", rid: r.id, amount, receive, plan, cardId };
-        return { status: _short ? "insufficient_offer_pay_later" : "ready_pay_later", balance: state.account.balance, recipient_id: r.id, amount_usd: amount, receives: receive, payments: plan.payments, each: plan.each, total_to_repay: plan.total, needs_confirmation: true };
+        return { status: _short ? "insufficient_offer_pay_later" : "ready_pay_later", alternative: _short ? "or add money with prepare_deposit" : undefined, balance: state.account.balance, recipient_id: r.id, amount_usd: amount, receives: receive, payments: plan.payments, each: plan.each, total_to_repay: plan.total, needs_confirmation: true };
       },
       offer_loan({ amount_usd, months } = {}) {
         const avail = creditAvailable();
@@ -293,9 +293,50 @@
         state.pending = { type: "open", cardId };
         return { status: "ready", needs_confirmation: true };
       },
-      talk_to_human() {
-        hooks.card("human", {});
-        return { status: "connecting", wait_minutes: 2 };
+      talk_to_human({ channel } = {}) {
+        const ch = /whats/i.test(channel || "") ? "whatsapp" : /app|aqui|here|chat/i.test(channel || "") ? "app" : null;
+        if (!ch) return { status: "need_channel", options: ["app", "whatsapp"] };
+        hooks.card("human", { channel: ch });
+        state.flags.human = ch;
+        return ch === "app" ? { status: "connecting", channel: "app", agent: "Lucía", wait_minutes: 2 } : { status: "opening_whatsapp", channel: "whatsapp" };
+      },
+      // ── Calculadora: cotiza sin mover dinero ──
+      show_quote({ recipient, amount_usd, amount_local, country } = {}) {
+        const r = recipient ? resolveRecipient(state, recipient) : null;
+        const cc = (r && r.country) || (country && CONFIG.rates[String(country).toUpperCase()] ? String(country).toUpperCase() : "MX");
+        const rate = CONFIG.rates[cc].rate;
+        let amount = amount_usd ? Number(amount_usd) : amount_local ? r2(Number(amount_local) / rate) : null;
+        if (!amount) return { status: "need_amount" };
+        amount = r2(amount);
+        const receive = r2(amount * rate), total = r2(amount + CONFIG.fee);
+        hooks.card("quote", { rid: r ? r.id : null, country: cc, amount, receive, total, fee: CONFIG.fee });
+        state.lastQuote = { rid: r ? r.id : null, amount };
+        return { status: "ok", country: cc, amount_usd: amount, fee: CONFIG.fee, total_usd: total, receives: receive, currency: CONFIG.rates[cc].cur, rate, recipient_id: r ? r.id : null, can_afford: total <= state.account.balance };
+      },
+      // ── Cargar dinero a la billetera Félix ──
+      prepare_deposit({ amount_usd, source } = {}) {
+        const amount = r2(Number(amount_usd || 0));
+        if (!amount) return { status: "need_amount", min: 10, max: 2500 };
+        if (amount < 10 || amount > 2500) return { status: "out_of_range", min: 10, max: 2500 };
+        const src = /bank|banco|cuenta/i.test(source || "") ? "bank" : "debit";
+        const cardId = hooks.card("deposit", { amount, source: src });
+        state.pending = { type: "deposit", amount, source: src, cardId };
+        return { status: "ready", amount_usd: amount, source: src === "bank" ? "Chase checking ••0917" : "Chase debit ••5521", fee: 0, arrives: src === "bank" ? "1-3 business days" : "instant", new_balance: r2(state.account.balance + amount), needs_confirmation: true };
+      },
+      show_profile() {
+        hooks.card("profile", {});
+        return { name: state.user.name, phone: "+1 (713) 555-0142", member_since: "March 2025", card_last4: state.account.card && state.account.card.last4, recipients: state.recipients.length };
+      },
+      show_product({ product } = {}) {
+        const p = /credit|cr[eé]dito|prest/i.test(product || "") ? "credit" : /card|tarjeta/i.test(product || "") ? "card" : /later|despu/i.test(product || "") ? "paylater" : "wallet";
+        hooks.card("product", { product: p });
+        const info = {
+          wallet: "Félix account: free, earns 4% APY, add money from any debit card instantly.",
+          card: "Félix Visa debit card: pay anywhere, freeze it any time, no monthly fee.",
+          paylater: "Send now, pay later: send today and pay in 4 payments every two weeks, no interest, $4.99 fixed fee.",
+          credit: `Félix credit line: up to $${state.credit.limit}, small loans paid every two weeks.`,
+        };
+        return { product: p, summary: info[p] };
       },
       cancel_pending() {
         const p = state.pending;
@@ -348,6 +389,13 @@
           hooks.card(done ? "loan_paid_off" : "installment_paid", {});
           return { status: done ? "paid_off" : "paid", paid: state.loan.paid, of: state.loan.n, balance: state.account.balance };
         }
+        if (p.type === "deposit") {
+          state.account.balance = r2(state.account.balance + p.amount);
+          state.movements.unshift({ id: nextId("m"), kind: "in", title: { es: "Carga a tu cuenta", en: "Money added" }, date: { es: "Hoy", en: "Today" }, amount: p.amount });
+          state.flags.deposit = true;
+          hooks.card("deposit_done", { amount: p.amount });
+          return { status: "deposited", amount: p.amount, balance: state.account.balance };
+        }
         if (p.type === "open") {
           state.account.open = true;
           state.account.card = { last4: "3307", frozen: false };
@@ -378,6 +426,12 @@
     payLater: /\b(paga\w* despues|pay later|envia\w* hoy|send now|a credito|fiado)\b/,
     loan: /\b(prestamo|credito|prestame|presta|prestas|adelanto|necesito dinero|me falta dinero|loan|borrow|lend|advance)\b/,
     send: /\b(envia\w*|envie\w*|enviar|mand\w*|transfer\w*|send|wire|remesa|deposit\w* a|pasale|pasar)\b/,
+    deposit: /\b(carga\w*|cargar|recarga\w* mi cuenta|meter dinero|mete\w* dinero|deposita\w* en mi|agrega\w* (dinero|saldo)|fondea\w*|add money|top up|load money|deposit)\b/,
+    quote: /\b(cuanto (le )?(llega|recibe)|cuanto llegaria|calcula\w*|cotiza\w*|how much (would|does|will) (she|he|they|it) (get|receive)|quote)\b|\by si (mando|envio)\b/,
+    profile: /\b(mi perfil|mis datos|perfil|profile|my info)\b/,
+    product: /\b(que es|como funciona|cuentame (de|sobre)|tell me about|what is|how does)\b/,
+    whatsapp: /\bwhats\s?app\b/,
+    inApp: /\b(aqui|por aqui|en la app|app|chat|here|in the app)\b/,
     greet: /^(hola|buenas|buenos dias|buenas tardes|hey|hi|hello|que onda)\b/,
     thanks: /\b(gracias|thank|thanks)\b/,
   };
@@ -408,11 +462,8 @@
           `Hi ${N()}, I'm Félix. I help you send money to your family. To start, who do you send money to, and what city do they live in?`);
       }
       ctx.awaiting = null;
-      if (state.loan && state.loan.paid < state.loan.n) {
-        return S(`Hola ${N()}. Tu cuota de ${usdSpoken(state.loan.installment, "es")} vence el ${state.loan.due.es}. ¿Qué hacemos hoy?`,
-          `Hi ${N()}. Your ${usdSpoken(state.loan.installment, "en")} payment is due ${state.loan.due.en}. What do you need today?`);
-      }
-      return S(`Hola ${N()}, ¿qué necesitas hoy?`, `Hi ${N()}, what do you need today?`);
+      return S(`Hola ${N()}, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?`,
+        `Hi ${N()}, I'm Félix. I can send money to your family, add money to your account, or send today so you pay later. What do you need?`);
     }
 
     // ── Envío ──
@@ -468,6 +519,21 @@
         `I'll lend you ${usdSpoken(res.amount, "en")} today. You pay ${res.payments} payments of ${usdSpoken(res.each, "en")} every two weeks. ${usdSpoken(res.total, "en")} in total. Should I accept it?`);
     }
 
+    // ── Cargar billetera ──
+    function tryDeposit(amount) {
+      const res = tools.prepare_deposit({ amount_usd: amount });
+      if (res.status === "out_of_range") { ctx.awaiting = "deposit_amount"; return S("Puedes cargar desde 10 hasta 2,500 dólares. ¿Cuánto cargo?", "You can add from $10 to $2,500. How much?"); }
+      ctx.awaiting = "confirm";
+      return S(`Cargo ${usdSpoken(res.amount_usd, "es")} desde tu débito Chase. Llega al instante y sin comisión. ¿Lo cargo?`, `I'll add ${usdSpoken(res.amount_usd, "en")} from your Chase debit. Instant and free. Should I?`);
+    }
+    // ── Calculadora ──
+    function tryQuote(a, r) {
+      const res = tools.show_quote({ recipient: r ? r.id : null, amount_usd: a.currency === "USD" ? a.value : null, amount_local: a.currency === "LOCAL" ? a.value : null });
+      ctx.awaiting = "after_quote";
+      const who = r ? recName(r.id) : S("tu familiar", "your family");
+      return S(`Si mandas ${usdSpoken(res.amount_usd, "es")}, ${who} recibe ${localSpoken(res.receives, res.country, "es")}. ¿Lo envío?`, `If you send ${usdSpoken(res.amount_usd, "en")}, ${who} gets ${localSpoken(res.receives, res.country, "en")}. Send it?`);
+    }
+
     // ── Confirmar / cancelar ──
     function confirm() {
       const p = state.pending;
@@ -477,6 +543,7 @@
       if (res.status === "sent") {
         return S(`Listo, ya va en camino a ${recName(res.recipient_id)}. Te aviso cuando llegue.`, `Done, it's on its way to ${recName(res.recipient_id)}. I'll let you know when it arrives.`);
       }
+      if (res.status === "deposited") return S(`Listo. Tu saldo ahora es de ${usdSpoken(res.balance, "es")}.`, `Done. Your balance is now ${usdSpoken(res.balance, "en")}.`);
       if (res.status === "disbursed") return S(`Listo. Ya tienes ${usdSpoken(res.amount, "es")} en tu cuenta. Tu primer pago es el ${res.first_payment}. ¿Quieres enviarlo a alguien?`, `Done. You have ${usdSpoken(res.amount, "en")} in your account. Your first payment is ${res.first_payment}. Want to send it to someone?`);
       if (res.status === "paid") return S(`Pagado. Llevas ${res.paid} de ${res.of}. Te queda un saldo de ${usdSpoken(res.balance, "es")}.`, `Paid. That's ${res.paid} of ${res.of}. Your balance is ${usdSpoken(res.balance, "en")}.`);
       if (res.status === "paid_off") return S("¡Terminaste de pagar tu préstamo! Tu línea de crédito sube para la próxima.", "You paid off your loan! Your credit line goes up for next time.");
@@ -564,13 +631,36 @@
         const a = parseAmount(t);
         if (a) { ctx.draft.amount = a.value; ctx.draft.currency = a.currency; return ctx.mode === "paylater" ? payLaterNow() : trySend(); }
       }
+      if (ctx.awaiting === "deposit_amount") { const a = parseAmount(t); if (a) return tryDeposit(a.value); }
+      if (ctx.awaiting === "quote_amount") { const a = parseAmount(t); if (a) return tryQuote(a, ctx.draft.rid ? state.recipients.find((x) => x.id === ctx.draft.rid) : resolveRecipient(state, t)); }
+      if (ctx.awaiting === "after_quote" && (RX.yes.test(t) || RX.send.test(t))) {
+        const q = state.lastQuote; const r = resolveRecipient(state, t);
+        ctx.mode = null; ctx.draft = { rid: r ? r.id : q && q.rid, amount: q && q.amount, currency: "USD" }; return trySend();
+      }
       if (ctx.awaiting === "loan_amount") {
         const a = parseAmount(t);
         if (a) return tryLoan(a.value);
       }
 
       // Intenciones
-      if (RX.human.test(t)) { tools.talk_to_human(); ctx.awaiting = null; return S("Te conecto con Lucía, del equipo Félix. Tarda unos dos minutos. Mientras, sigo aquí.", "I'm connecting you with Lucía from the Félix team. It takes about two minutes. I'm still here meanwhile."); }
+      if (ctx.awaiting === "human_channel" || (RX.human.test(t) && (RX.whatsapp.test(t)))) {
+        const ch = RX.whatsapp.test(t) ? "whatsapp" : RX.inApp.test(t) ? "app" : null;
+        if (ch) { ctx.awaiting = null; tools.talk_to_human({ channel: ch }); return ch === "app" ? S("Te conecto con Lucía, del equipo Félix. Tarda unos dos minutos.", "I'm connecting you with Lucía from the Félix team. About two minutes.") : S("Listo, te abro WhatsApp con el equipo Félix.", "Done, I'm opening WhatsApp with the Félix team."); }
+      }
+      if (RX.human.test(t) || /\b(ayuda|help|soporte|support|ninja)\b/.test(t)) { ctx.awaiting = "human_channel"; return S("Claro. ¿Prefieres hablar con alguien del equipo aquí en la app o por WhatsApp?", "Sure. Do you want to talk to someone from the team here in the app or on WhatsApp?"); }
+      if (RX.deposit.test(t) && !RX.send.test(t.replace(/deposit\w* a\b/, ""))) {
+        const a = parseAmount(t);
+        if (state.pending) tools.cancel_pending();
+        if (!a) { ctx.awaiting = "deposit_amount"; return S("¿Cuánto quieres cargar a tu cuenta?", "How much do you want to add to your account?"); }
+        return tryDeposit(a.value);
+      }
+      if (RX.quote.test(t)) {
+        const a = parseAmount(t); const r = resolveRecipient(state, t);
+        if (!a) { ctx.awaiting = "quote_amount"; ctx.draft = { rid: r ? r.id : null }; return S("¿Cuánto quieres calcular?", "How much should I calculate?"); }
+        return tryQuote(a, r);
+      }
+      if (RX.profile.test(t)) { tools.show_profile(); return S("Este es tu perfil.", "Here's your profile."); }
+      if (RX.product.test(t)) { const res = tools.show_product({ product: t }); return S("Te dejo un resumen en pantalla. ¿Quieres usarlo ahora?", "Here's a summary on screen. Want to use it now?"); }
       if (RX.payLater.test(t)) { const r = resolveRecipient(state, t); const a = parseAmount(t); ctx.draft = { rid: r ? r.id : ctx.draft.rid, amount: a ? a.value : ctx.draft.amount, currency: a ? a.currency : ctx.draft.currency || "USD" }; if (state.pending) tools.cancel_pending(); return payLaterNow(); }
       if (RX.installment.test(t)) {
         const res = tools.prepare_installment_payment();

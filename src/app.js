@@ -17,13 +17,13 @@
       noSR: "Tu navegador no reconoce voz. Escribe, o abre en Chrome o Safari.", micDenied: "Permite el micrófono para hablar con Félix.",
       noSpeech: "No te escuché. Toca y habla de nuevo.", hfOn: "Manos libres: Félix escucha después de hablar", hfOff: "Manos libres apagado",
       muteOn: "Félix en silencio. Lee los subtítulos.", muteOff: "Félix habla en voz alta",
-      tryTitle: "Prueba decir", engineTitle: "Motor de voz", tips: "Cómo probar",
-      tipsBody: "Toca el círculo y habla. Félix responde en voz alta y te pregunta lo que falte. Interrúmpelo tocando el círculo. Con manos libres, la conversación sigue sola.",
+      tryTitle: "Guion de prueba (el usuario lo dice en voz)", engineTitle: "Motor de voz", tips: "Cómo probar",
+      tipsBody: "Prototipo solo voz: no hay teclado ni botones de texto. Toca el círculo una vez y habla. Félix contesta con voz y muestra tarjetas de resumen. Para interrumpirlo, habla. Para terminar, toca el círculo.",
       engDemo: "Voz del navegador. Sirve para probar flujos. La voz natural llega con ElevenLabs en la fase 2.",
       srOk: "Reconocimiento de voz disponible", srNo: "Sin reconocimiento de voz en este navegador",
       confirm: "Confirmar", cancel: "Cancelar", done: "Hecho", cancelled: "Cancelado",
       sayConfirm: "Sí, confirmo", sayCancel: "Cancelar", shared: "Comprobante copiado",
-      share: "Compartir comprobante", openAcc: "Abrir mi cuenta", notNow: "Ahora no",
+      share: "Compartir comprobante", waOpen: "En la prueba real se abriría WhatsApp", openAcc: "Abrir mi cuenta", notNow: "Ahora no",
       elNotSet: "sin configurar", connecting: "Conectando con Félix…", tapToEnd: "Te escucho · toca para terminar", talkToInterrupt: "Habla para interrumpirlo",
       elFail: "No pude conectar con ElevenLabs. Sigo con la voz del navegador.", elCode: "Este link necesita un código de acceso.",
       engEl: "Voz natural con ElevenLabs. Conversación continua: habla cuando quieras, interrumpe cuando quieras. Toca el círculo para terminar.",
@@ -39,13 +39,13 @@
       noSR: "This browser can't recognize speech. Type, or open it in Chrome or Safari.", micDenied: "Allow the microphone to talk to Félix.",
       noSpeech: "I didn't hear you. Tap and talk again.", hfOn: "Hands-free: Félix listens after speaking", hfOff: "Hands-free off",
       muteOn: "Félix muted. Read the captions.", muteOff: "Félix speaks out loud",
-      tryTitle: "Try saying", engineTitle: "Voice engine", tips: "How to test",
-      tipsBody: "Tap the circle and talk. Félix answers out loud and asks for whatever is missing. Interrupt by tapping the circle. With hands-free on, the conversation keeps going.",
+      tryTitle: "Test script (the user says it out loud)", engineTitle: "Voice engine", tips: "How to test",
+      tipsBody: "Voice-only prototype: no keyboard or text buttons. Tap the circle once and talk. Félix answers out loud and shows summary cards. Talk to interrupt. Tap the circle to end.",
       engDemo: "Browser voice. Good for testing flows. The natural voice arrives with ElevenLabs in phase 2.",
       srOk: "Speech recognition available", srNo: "No speech recognition in this browser",
       confirm: "Confirm", cancel: "Cancel", done: "Done", cancelled: "Cancelled",
       sayConfirm: "Yes, confirm", sayCancel: "Cancel", shared: "Receipt copied",
-      share: "Share receipt", openAcc: "Open my account", notNow: "Not now",
+      share: "Share receipt", waOpen: "In the real app WhatsApp would open", openAcc: "Open my account", notNow: "Not now",
       elNotSet: "not set", connecting: "Connecting to Félix…", tapToEnd: "Listening · tap to end", talkToInterrupt: "Talk to interrupt",
       elFail: "I couldn't connect to ElevenLabs. Using the browser voice.", elCode: "This link needs an access code.",
       engEl: "Natural voice with ElevenLabs. Continuous conversation: talk any time, interrupt any time. Tap the circle to end.",
@@ -69,6 +69,10 @@
     loop: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
     stop: '<rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/>',
     person: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/>',
+    wa: '<path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 0 1-1.8-1.8l.8-1-1-2z"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    bank: '<path d="M3 10l9-6 9 6M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/>',
     check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     snow: '<path d="M12 2v20M4.9 6.5l14.2 11M19.1 6.5 4.9 17.5M9.5 3.5 12 6l2.5-2.5M9.5 20.5 12 18l2.5 2.5"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
@@ -287,7 +291,6 @@
         `Escenario: ${s.scenario === "new" ? "usuario nuevo" : "usuario actual"}. account_open = ${s.account.open}.`,
         s.account.open ? `Saldo: $${s.account.balance}. Tarjeta débito •••• ${s.account.card ? s.account.card.last4 : "-"}${s.account.card && s.account.card.frozen ? " (congelada)" : ""}.` : "Aún no tiene cuenta ni tarjeta.",
         `Crédito disponible: $${(s.credit.limit - s.credit.used).toFixed(2)}.`,
-        s.loan ? `Préstamo activo: cuota ${s.loan.paid + 1} de ${s.loan.n}, $${s.loan.installment}, vence ${s.loan.due.es}.` : "Sin préstamo activo.",
         `Familiares guardados: ${recs}.`,
         `Día de pago: ${s.payday ? tr(s.payday) : "no definido"}.`,
         `Fecha de hoy: 27 de octubre de 2026.`,
@@ -429,7 +432,7 @@
     const elBtn = $("#eng-el");
     elBtn.disabled = elReady !== true;
     $("#eng-el-note").textContent = elReady === false ? " · " + t("elNotSet") : "";
-    $("#btn-human").innerHTML = I("person", 21, 1.8); $("#btn-human").title = t("human");
+    $("#btn-human").innerHTML = I("help", 22, 1.8); $("#btn-human").title = S("Ayuda", "Help");
     $("#kb").classList.toggle("on", prefs.kb);
     $("#kb-input").placeholder = t("typeHere");
     $("#kb-send").innerHTML = I("send", 20, 2.2);
@@ -486,15 +489,19 @@
   }
   function renderChips() {
     const el = $("#chips");
+    el.innerHTML = ""; return; // prototipo solo voz: sin chips de texto
     if (!brain || status === "listening" || status === "thinking") { el.innerHTML = ""; return; }
     el.innerHTML = chipList().map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");
   }
 
   function renderSides() {
-    const tries = prefs.scenario === "new"
-      ? [S("A mi mamá en Guadalajara", "My mom in Guadalajara"), S("Me pagan cada viernes", "I get paid every Friday"), S("Sí, ábrela", "Yes, open it"), S("Sí, 100 dólares", "Yes, $100"), S("Quiero hablar con una persona", "I want to talk to a person")]
-      : [S("Mándale 100 dólares a mi mamá", "Send my mom $100"), S("Envíale 2,000 pesos a mi papá", "Send my dad 2,000 pesos"), S("Mándale 1,300 a Ana", "Send Ana $1,300"), S("Envía hoy y paga después 150 a mi tío Carlos", "Send now, pay later $150 to Uncle Carlos"), S("Necesito un préstamo de 200 dólares", "I need a $200 loan"), S("Paga mi cuota", "Pay my installment"), S("Congela mi tarjeta", "Freeze my card"), S("Muéstrame mis movimientos", "Show my transactions"), S("¿Cuánto tengo?", "How much do I have?")];
-    $("#side-left").innerHTML = `<h3>${t("tryTitle")}</h3><div class="try">${tries.map((x) => `<button data-say="${esc(x)}">“${esc(x)}”</button>`).join("")}</div>`;
+    const groups = [
+      [S("1 · Remesa con calculadora", "1 · Remittance + calculator"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does my mom get if I send $200?"), S("¿Y si mando 300?", "And if I send $300?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100")]],
+      [S("2 · Cargar dinero", "2 · Add money"), [S("Quiero cargar 200 dólares a mi cuenta", "I want to add $200 to my account")]],
+      [S("3 · Envía hoy, paga después", "3 · Send now, pay later"), [S("Mándale 1,500 a mi papá", "Send my dad $1,500"), S("Envía hoy y paga después 150 a mi tío Carlos", "Send now, pay later $150 to Uncle Carlos")]],
+      [S("Acciones simples", "Simple actions"), [S("Quiero hablar con alguien", "I want to talk to someone"), S("Muéstrame mi perfil", "Show my profile"), S("¿Cómo funciona paga después?", "How does pay later work?")]],
+    ];
+    $("#side-left").innerHTML = `<h3>${t("tryTitle")}</h3>` + groups.map(([g, xs]) => `<div class="tg">${g}</div><div class="try">${xs.map((x) => `<div class="tr">“${esc(x)}”</div>`).join("")}</div>`).join("");
     $("#side-right").innerHTML = `<h3>${t("tips")}</h3><p style="margin-bottom:22px">${t("tipsBody")}</p>
       <h3>${t("engineTitle")}</h3>
       ${isEL() ? `<div class="status-line"><span class="dot"></span>ElevenLabs</div><p>${t("engEl")}</p>`
@@ -614,7 +621,35 @@
       case "account_opened":
         return `<div class="${cls}">${head(S("Cuenta abierta", "Account open"), S("Activa", "Active"), "ok")}${dcardHTML("3307", false)}<div class="rows"><div class="row"><span>${t("balance")}</span><b>${money(state.account.balance)}</b></div><div class="row"><span>${S("Paga después disponible", "Pay later available")}</span><b>${money(state.credit.limit - state.credit.used)}</b></div></div></div>`;
       case "human":
-        return `<div class="${cls}">${head(S("Equipo Félix", "Félix team"), S("~2 min", "~2 min"))}<div class="who"><div class="ini" style="background:var(--ink);color:var(--screen)">L</div><div><div class="nm">Lucía</div><div class="ds">${S("Se está uniendo", "Joining")}<span class="typing"><i></i><i></i><i></i></span></div></div></div></div>`;
+        if (d.channel === "whatsapp") return `<div class="${cls}">${head(S("Equipo Félix", "Félix team"), "WhatsApp", "ok")}<div class="who"><div class="ini" style="background:#25d366;color:#fff">${I("wa", 20, 1.8)}</div><div><div class="nm">${S("Seguimos en WhatsApp", "Continue on WhatsApp")}</div><div class="ds">${S("Un ninja de Félix te escribe ahí", "A Félix ninja will message you there")}</div></div></div><div class="acts"><button class="btn sec" data-toast="waOpen">${S("Abrir WhatsApp", "Open WhatsApp")}</button></div></div>`;
+        return `<div class="${cls}">${head(S("Equipo Félix", "Félix team"), S("~2 min", "~2 min"))}<div class="who"><div class="ini" style="background:var(--ink);color:var(--screen)">L</div><div><div class="nm">Lucía</div><div class="ds">${S("Se está uniendo en la app", "Joining in the app")}<span class="typing"><i></i><i></i><i></i></span></div></div></div></div>`;
+      case "quote": {
+        const r = d.rid ? recOf(d.rid) : null, rt = C.CONFIG.rates[d.country];
+        return `<div class="${cls}">${head(S("Calculadora", "Calculator"), `1 USD = ${rt.rate} ${rt.cur}`, "cyan")}
+          <div class="calc"><div><div class="lbl">${S("Envías", "You send")}</div><div class="amt">${money(d.amount)}</div></div><div class="arrow">→</div><div><div class="lbl">${r ? esc(tr(r.short)) + " " + S("recibe", "gets") : S("Recibe", "They get")}</div><div class="amt">${C.local(d.receive, d.country, prefs.lang)}</div></div></div>
+          <div class="rows"><div class="row"><span>${S("Comisión", "Fee")}</span><b>${money(d.fee)}</b></div><div class="row total"><span>${S("Total a pagar", "Total")}</span><b>${money(d.total)}</b></div></div>
+          <div class="note">${S("Solo es un cálculo. No se mueve dinero.", "Just a quote. No money moves.")}</div></div>`;
+      }
+      case "deposit":
+        return `<div class="${cls}">${head(S("Cargar dinero", "Add money"), d.source === "bank" ? S("1 a 3 días", "1-3 days") : S("Al instante", "Instant"), "cyan")}
+          <div class="big">+${money(d.amount)}</div><div class="sub">${S("A tu cuenta Félix", "To your Félix account")}</div>
+          <div class="rows"><div class="row"><span>${S("Desde", "From")}</span><b>${d.source === "bank" ? "Chase ••0917" : S("Débito Chase ••5521", "Chase debit ••5521")}</b></div>
+          <div class="row"><span>${S("Comisión", "Fee")}</span><b>$0.00</b></div>
+          <div class="row total"><span>${S("Nuevo saldo", "New balance")}</span><b>${money(c.resolved === "done" ? state.account.balance : state.account.balance + d.amount)}</b></div></div>${acts(c, S("Cargar", "Add"))}</div>`;
+      case "deposit_done":
+        return `<div class="${cls}">${head(S("Dinero cargado", "Money added"), S("Listo", "Done"), "ok")}<div class="big">${money(state.account.balance)}</div><div class="sub">${S("Saldo disponible", "Available balance")}</div></div>`;
+      case "profile":
+        return `<div class="${cls}">${head(S("Tu perfil", "Your profile"))}<div class="who"><div class="ini" style="background:var(--ink);color:var(--screen)">${esc(state.user.name.charAt(0).toUpperCase())}</div><div><div class="nm">${esc(state.user.name)}</div><div class="ds">${S("Cliente desde marzo 2025", "Member since March 2025")}</div></div></div>
+          <div class="rows"><div class="row"><span>${S("Teléfono", "Phone")}</span><b>+1 (713) 555-0142</b></div><div class="row"><span>${S("Tarjeta de débito", "Debit card")}</span><b>•••• ${state.account.card ? state.account.card.last4 : "—"}</b></div><div class="row"><span>${S("Familiares guardados", "Saved recipients")}</span><b>${state.recipients.length}</b></div><div class="row"><span>${S("Acceso", "Sign-in")}</span><b>Face ID</b></div></div></div>`;
+      case "product": {
+        const P2 = {
+          wallet: [S("Cuenta Félix", "Félix account"), [S("Gratis, sin costo mensual", "Free, no monthly fee"), S("Tu dinero gana 4% anual", "Your money earns 4% APY"), S("Carga desde cualquier débito al instante", "Add money from any debit card instantly")]],
+          card: [S("Tarjeta de débito Félix", "Félix debit card"), [S("Visa, paga donde sea", "Visa, pay anywhere"), S("Congélala cuando quieras", "Freeze it any time"), S("Sin costo mensual", "No monthly fee")]],
+          paylater: [S("Envía hoy, paga después", "Send now, pay later"), [S("Tu familia recibe hoy", "Your family gets it today"), S("4 pagos cada quince días", "4 payments every two weeks"), S("Sin intereses, cargo fijo de $4.99", "No interest, $4.99 fixed fee")]],
+          credit: [S("Crédito Félix", "Félix credit"), [S("Préstamos pequeños al instante", "Small loans instantly"), S("Pagos cada quince días", "Payments every two weeks"), S("Tu línea crece si pagas a tiempo", "Your line grows when you pay on time")]],
+        }[d.product];
+        return `<div class="${cls}">${head(P2[0])}<div class="bullets">${P2[1].map((x) => `<div>${I("check", 16, 2.6)}${x}</div>`).join("")}</div></div>`;
+      }
     }
     return "";
   }
@@ -649,14 +684,14 @@
   $("#btn-kb").addEventListener("click", () => { prefs.kb = !prefs.kb; if (prefs.kb && status === "listening") { Voice.stopAll(); setStatus("idle"); setCaption(""); } render(); if (prefs.kb) $("#kb-input").focus(); });
   $("#btn-mute").addEventListener("click", () => { prefs.muted = !prefs.muted; EL.setMuted(prefs.muted); if (!isEL() && prefs.muted && status === "speaking") { Voice.stopSpeaking(); setStatus("idle"); } toast(t(prefs.muted ? "muteOn" : "muteOff")); render(); });
   $("#btn-hf").addEventListener("click", () => { prefs.handsFree = !prefs.handsFree; toast(t(prefs.handsFree ? "hfOn" : "hfOff")); render(); });
-  $("#btn-human").addEventListener("click", () => userSays(S("Quiero hablar con una persona", "I want to talk to a person"), "tap"));
+  $("#btn-human").addEventListener("click", () => userSays(S("Necesito ayuda", "I need help"), "tap"));
   $("#kb").addEventListener("submit", (e) => { e.preventDefault(); const v = $("#kb-input").value; $("#kb-input").value = ""; userSays(v, "kb"); });
   document.addEventListener("keydown", (e) => { if (e.code === "Space" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); onOrb(); } });
   window.addEventListener("resize", fit);
 
   // Parámetros de URL: ?s=new|steady&lang=es|en&theme=dark
   const q = new URLSearchParams(location.search);
-  if (q.get("s") === "new" || q.get("s") === "steady") prefs.scenario = q.get("s");
+  // Solo voz: siempre usuario con cuenta (el onboarding es otro prototipo)
   if (q.get("lang") === "en") prefs.lang = "en";
   if (q.get("theme") === "dark") prefs.theme = "dark";
   // Nombre del tester: se pregunta al inicio (o llega en el link con ?name=)
