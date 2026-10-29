@@ -323,6 +323,9 @@
         `Familiares guardados: ${recs}.`,
         `Tarjeta de débito Visa •••• ${s.account.card ? s.account.card.last4 : "-"}${s.account.card && s.account.card.frozen ? " (congelada)" : " (activa)"}.`,
         s.loan ? `Préstamo activo: cuota ${s.loan.paid + 1} de ${s.loan.n}, $${s.loan.installment}, vence ${s.loan.due.es}.` : "Sin préstamo activo.",
+        s.kyc ? `KYC: términos ${s.kyc.terms ? "aceptados" : "pendientes"}; nombre completo ${s.kyc.fullName || "pendiente"}; fecha de nacimiento ${s.kyc.birthDate || "pendiente"}; identificación ${s.kyc.verified ? "verificada" : s.kyc.idType ? "escaneo pendiente" : "pendiente"}.` : "",
+        `Tarjeta de débito para pagar: ${s.debitCard ? "Visa ••" + s.debitCard.last4 : "no agregada"}.`,
+        s.snplActive ? "Tiene un préstamo Envía ahora, paga después activo (solo uno a la vez)." : "",
         `Servicios pendientes: ${(s.bills || []).filter((b) => !b.paid).map((b) => `${b.label.es} (${b.provider}) $${b.amount}, vence ${b.due.es}`).join("; ") || "ninguno"}.`,
         `Día de pago: ${s.payday ? tr(s.payday) : "no definido"}.`,
         `Fecha de hoy: 27 de octubre de 2026.`,
@@ -544,7 +547,7 @@
     const card = turnCards.length ? cards[turnCards[turnCards.length - 1].id] : null;
     const you = lastU > lastF ? msgs[lastU].text : "";
     $("#screen").classList.toggle("has-card", !!card);
-    const key = [lastF, lastU, card ? card.id + (card.resolved || "") + JSON.stringify(state.transfers) : "", status === "listening"].join("|");
+    const key = [lastF, lastU, card ? card.id + (card.resolved || "") + JSON.stringify(state.transfers) + JSON.stringify(state.kyc || {}) + JSON.stringify(state.snpl || {}) : "", status === "listening"].join("|");
     if (el.dataset.k === key) return;
     el.dataset.k = key;
     el.innerHTML = `<div class="spacer-top"></div>
@@ -572,9 +575,12 @@
     if (aw === "after_quote") return [[S("Sí, envíalo", "Yes, send it"), true], [S("¿Y si mando 300?", "And if I send $300?")]];
     if (aw === "deposit_amount") return [["$50"], ["$100"], ["$200"]];
     if (aw === "human_channel") return [[S("Aquí en la app", "Here in the app")], ["WhatsApp"]];
+    if (FC && state.snpl && !state.snpl.approved && !state.pending) return [[S("Acepto firmar electrónicamente", "I agree to e-sign"), true], ["x"]];
+    if (FC && state.snpl && state.snpl.approved && !state.snpl.termsOk && !state.pending) return [[S("Acepto los términos del préstamo", "I accept the loan terms"), true], ["x"]];
+    if (FC && state.snpl && state.snpl.termsOk && state.snpl.autopay === null && !state.pending) return [[S("Con pago automático", "With autopay")], [S("Sin pago automático", "Without autopay")]];
     if (FC) return state.account.open
-      ? [[S("Mandar dinero", "Send money")], [S("Envía hoy, paga después", "Send now, pay later")], [S("Pedir un crédito", "Get a loan")], [S("Cargar dinero", "Add money")]]
-      : [[S("Abrir mi cuenta", "Open my account")], [S("Mandar dinero", "Send money")], [S("Envía hoy, paga después", "Send now, pay later")], [S("Pedir un crédito", "Get a loan")]];
+      ? [[S("Mandar dinero", "Send money")], [S("Envía ahora, paga después", "Send now, pay later")], [S("Pedir un préstamo", "Get a loan")], [S("Cargar dinero", "Add money")]]
+      : [[S("Abrir mi cuenta", "Open my account")], [S("Mandar dinero", "Send money")], [S("Envía ahora, paga después", "Send now, pay later")], [S("Pedir un préstamo", "Get a loan")]];
     return [[S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?")], [S("Mándale $100 a mi mamá", "Send Mom $100")], [S("Quiero cargar dinero", "I want to add money")], [S("Envía hoy y paga después", "Send now, pay later")]];
   }
   function renderChips() {
@@ -584,6 +590,7 @@
     if (FC) {
       // Solo las acciones del momento (máx. 2). Antes de la primera interacción, 2 ideas para empezar.
       let list = chipList();
+      list = list.filter(([t]) => t !== "x");
       const isDefault = !state.pending && list.length === 4;
       if (!state.user.name) list = [];
       else if (isDefault && msgs.slice(namedAt + 1).some((m) => m.role === "user")) list = [];
@@ -595,12 +602,11 @@
 
   function renderSides() {
     const groups = FC ? [
-      [S("1 · Presentarse", "1 · Introduce yourself"), [S("Me llamo Pato", "My name is Pato")]],
-      [S("2 · Abrir cuenta", "2 · Open account"), [S("Quiero abrir mi cuenta", "I want to open my account"), S("Sí, ábrela", "Yes, open it")]],
-      [S("3 · Enviar a alguien nuevo", "3 · Send to someone new"), [S("Quiero mandarle 100 dólares a mi prima Lupe en Puebla", "I want to send $100 to my cousin Lupe in Puebla"), S("Que lo reciba en efectivo", "Cash pickup, please"), S("¿Cuánto le llega si mando 150?", "How much does she get if I send $150?")]],
-      [S("4 · Envía hoy, paga después", "4 · Send now, pay later"), [S("No tengo saldo, ¿lo puedo pagar después?", "I have no balance, can I pay later?"), S("Sí, envíalo así", "Yes, send it like that")]],
-      [S("5 · Crédito", "5 · Credit"), [S("Necesito un préstamo de 200 dólares", "I need a $200 loan")]],
-      [S("Otros", "Other"), [S("Quiero cargar 100 dólares a mi cuenta", "Add $100 to my account"), S("Quiero hablar con alguien", "I want to talk to someone")]],
+      [S("1 · Presentarse", "1 · Introduce yourself"), [S("Me llamo Ana", "My name is Ana")]],
+      [S("2 · Abrir cuenta (datos de prueba)", "2 · Open account (test data)"), [S("Quiero abrir mi cuenta", "I want to open my account"), S("Sí, acepto", "Yes, I accept"), S("Me llamo Ana Prueba López y nací el 3 de mayo de 1990", "My name is Ana Test Lopez, born May 3, 1990"), S("Tengo matrícula consular", "I have a consular ID")]],
+      [S("3 · Enviar a alguien nuevo", "3 · Send to someone new"), [S("Quiero mandar 100 dólares a México", "I want to send $100 to Mexico"), S("Se llama Lupe Martínez y vive en Puebla", "Her name is Lupe Martinez, she lives in Puebla"), S("A su cuenta de BBVA, usa una CLABE de prueba", "To her BBVA account, use a test CLABE"), S("Que lo cobre en efectivo en Elektra", "Cash pickup at Elektra")]],
+      [S("4 · Pagar", "4 · Pay"), [S("Agrega mi tarjeta de débito", "Add my debit card"), S("Con mi tarjeta de débito", "With my debit card"), S("Envía ahora, paga después", "Send now, pay later"), S("Mi dirección es 123 Main Street, Houston", "My address is 123 Main Street, Houston"), S("Sí, acepto firmar", "Yes, I agree to sign"), S("Sin pago automático", "Without autopay")]],
+      [S("5 · Préstamo a tu cuenta", "5 · Loan to your account"), [S("Quiero un préstamo de 150 dólares", "I want a $150 loan")]],
     ] : [
       [S("1 · Remesa con calculadora", "1 · Remittance + calculator"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does my mom get if I send $200?"), S("¿Y si mando 300?", "And if I send $300?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100")]],
       [S("2 · Cargar dinero", "2 · Add money"), [S("Quiero cargar 200 dólares a mi cuenta", "I want to add $200 to my account")]],
@@ -747,6 +753,68 @@
       case "profile":
         return `<div class="${cls}">${head(S("Tu perfil", "Your profile"))}<div class="who"><div class="ini" style="background:var(--ink);color:var(--screen)">${esc(state.user.name.charAt(0).toUpperCase())}</div><div><div class="nm">${esc(state.user.name)}</div><div class="ds">${S("Cliente desde marzo 2025", "Member since March 2025")}</div></div></div>
           <div class="rows"><div class="row"><span>${S("Teléfono", "Phone")}</span><b>+1 (713) 555-0142</b></div><div class="row"><span>${S("Tarjeta de débito", "Debit card")}</span><b>•••• ${state.account.card ? state.account.card.last4 : "—"}</b></div><div class="row"><span>${S("Familiares guardados", "Saved recipients")}</span><b>${state.recipients.length}</b></div><div class="row"><span>${S("Acceso", "Sign-in")}</span><b>Face ID</b></div></div></div>`;
+      case "terms":
+        return `<div class="${cls}">${head(S("Términos", "Terms"), S("Aceptados", "Accepted"), "ok")}<div class="bullets">${[S("Comunicaciones digitales (E-SIGN)", "Digital communications (E-SIGN)"), S("Términos de la Cuenta Félix", "Félix Account terms"), S("Términos de rendimiento", "Yield terms")].map((x) => `<div>${I("check", 16, 2.6)}${x}</div>`).join("")}</div></div>`;
+      case "identity":
+        return `<div class="${cls}">${head(S("Tus datos", "Your details"), S("Prueba", "Test"))}<div class="rows"><div class="row"><span>${S("Nombre completo", "Full name")}</span><b>${esc(state.kyc.fullName)}</b></div><div class="row"><span>${S("Fecha de nacimiento", "Date of birth")}</span><b>${esc(state.kyc.birthDate)}</b></div></div></div>`;
+      case "id_scan": {
+        const v = state.kyc.verified, st = state.kyc.scan || 0;
+        const btn = v ? `<div class="done-note">${I("check", 16, 2.6)} ${S("Identidad verificada", "Identity verified")}</div>`
+          : st === 1 ? `<div class="acts scan-acts"><button class="btn pri" data-scan="selfie">${S("Tomar selfie", "Take selfie")}</button></div>`
+          : st === 2 || st === 3 ? `<div class="scan-run">${S("Verificando…", "Verifying…")}<span class="typing"><i></i><i></i><i></i></span></div>`
+          : `<div class="acts scan-acts"><button class="btn pri" data-scan="id">${S("Escanear mi identificación", "Scan my ID")}</button></div>`;
+        return `<div class="${cls}">${head(S("Verifica tu identidad", "Verify your identity"), esc(d.idType || ""), "cyan")}
+          <div class="idframe ${st === 2 ? "scanning" : ""} ${st >= 1 ? "got" : ""}"><span>${st >= 1 ? S("ID capturada", "ID captured") : S("Coloca tu ID dentro del marco", "Place your ID in the frame")}</span></div>
+          <div class="note">${S("Simulado: no se guarda ninguna foto.", "Simulated: no photo is stored.")}</div>${btn}</div>`;
+      }
+      case "debit_added":
+        return `<div class="${cls}">${head(S("Tarjeta de débito", "Debit card"), S("Agregada", "Added"), "ok")}<div class="who"><div class="ini">VISA</div><div><div class="nm">Chase Visa •••• 4242</div><div class="ds">${S("Tarjeta de prueba", "Test card")}</div></div></div></div>`;
+      case "pay_methods": {
+        const o = d.opts, r = recOf(d.rid);
+        const row = (key, title, sub, ok) => `<button class="pm ${ok ? "" : "off"}" ${ok ? `data-say="${esc(title)}"` : "disabled"}><span><b>${title}</b><small>${sub}</small></span>${ok ? I("send", 16, 2) : ""}</button>`;
+        return `<div class="${cls}">${head(S("Elige tu forma de pago", "Choose how to pay"), money(d.amount + C.CONFIG.fee))}
+          ${row("debit", S("Con mi tarjeta de débito", "With my debit card"), o.debit_card.available ? "Visa ••4242" : S("Agrega una tarjeta", "Add a card"), o.debit_card.available)}
+          ${row("balance", S("Con mi saldo Félix", "With my Félix balance"), money(o.balance.balance || 0), o.balance.available)}
+          ${row("snpl", S("Envía ahora, paga después", "Send now, pay later"), o.snpl.available ? S(`Hasta ${money(o.snpl.approved_amount_usd)} · hoy solo comisiones`, `Up to ${money(o.snpl.approved_amount_usd)} · fees only today`) : ({ identity_not_verified: S("Necesita tu cuenta verificada", "Needs a verified account"), needs_debit_card_for_fees: S("Necesita una tarjeta de débito", "Needs a debit card"), one_active_loan_at_a_time: S("Ya tienes un préstamo activo", "You already have an active loan"), over_approved_amount: S(`Solo hasta ${money(o.snpl.approved_amount_usd || 150)}`, `Only up to ${money(o.snpl.approved_amount_usd || 150)}`) }[o.snpl.reason] || ""), o.snpl.available)}
+          <div class="note">${S("Para", "To")} ${esc(r ? r.name : "")}</div></div>`;
+      }
+      case "review": {
+        const r = recOf(d.rid), rt = C.CONFIG.rates[r.country];
+        return `<div class="${cls}">${head(S("Revisa y confirma", "Review and confirm"), S("Llega en minutos", "Arrives in minutes"), "cyan")}${whoHTML(r)}
+          <div class="receive"><div class="lbl">${S("Recibe", "They get")}</div><div class="amt">${C.local(d.receive, r.country, prefs.lang)}</div></div>
+          <div class="rows"><div class="row"><span>${S("Envías", "You send")}</span><b>${money(d.amount)}</b></div><div class="row"><span>${S("Comisión de envío", "Transfer fee")}</span><b>${money(d.fee)}</b></div>
+          <div class="row"><span>${S("Tipo de cambio", "Rate")}</span><b>1 USD = ${rt.rate} ${rt.cur}</b></div><div class="row"><span>${S("Pagas con", "Paid with")}</span><b>${d.via === "balance" ? S("Saldo Félix", "Félix balance") : "Visa ••4242"}</b></div>
+          <div class="row total"><span>${S("Total a pagar", "Total")}</span><b>${money(d.total)}</b></div></div>${acts(c, S("Enviar", "Send"))}</div>`;
+      }
+      case "snpl_intro": {
+        const r = recOf(d.rid);
+        return `<div class="${cls}">${head(S("Envía ahora, paga después", "Send now, pay later"), S("Préstamo", "Loan"), "cyan")}
+          <div class="sub" style="margin-bottom:8px">${S(`Te prestamos ${money(d.amount)} para enviarle a ${esc(r.name.split(" ")[0])}. Hoy solo pagas las comisiones.`, `We lend you ${money(d.amount)} to send to ${esc(r.name.split(" ")[0])}. Today you only pay the fees.`)}</div>
+          <div class="steps">${[S("Dirección y firma electrónica", "Address and e-sign"), S("Envía tu solicitud", "Submit application"), S("Aprobación", "Approval"), S("Términos del préstamo", "Loan terms"), S("Pago automático", "Autopay"), S("Revisa y confirma", "Review and confirm")].map((l, i) => { const sp = state.snpl || {}; const done = [sp.address && sp.esign, sp.approved, sp.approved, sp.termsOk, sp.autopay !== null && sp.autopay !== undefined, !!(state.snplActive)][i]; return `<div class="step ${done ? "on" : ""}"><span class="bul">${done ? I("check", 12, 3) : ""}</span><div><div class="lb">${l}</div></div></div>`; }).join("")}</div></div>`;
+      }
+      case "snpl_terms": {
+        const p = state.snpl.plan;
+        return `<div class="${cls}">${head(S("¡Estás aprobado!", "You're approved!"), S("Términos del préstamo", "Loan terms"), "ok")}
+          <div class="big">${money(p.amount)}</div><div class="sub">${S("Préstamo para tu envío", "Loan for your transfer")}</div>
+          <div class="sched">${p.dates.map((dt) => `<div><b>${money(p.each)}</b><span>${C.dateLabel(new Date(dt), prefs.lang)}</span></div>`).join("")}</div>
+          <div class="rows"><div class="row"><span>${S("Comisión del préstamo", "Loan fee")}</span><b>${money(p.loanFee)}</b></div><div class="row"><span>${S("Comisión del envío", "Transfer fee")}</span><b>${money(C.CONFIG.fee)}</b></div>
+          <div class="row"><span>${S("Pagas hoy", "You pay today")}</span><b>${money(p.payToday)}</b></div><div class="row total"><span>${S("Total que pagas", "Total you pay")}</span><b>${money(p.total)}</b></div></div>
+          <div class="note">${S("Préstamo otorgado por Lead Bank. Valores de prueba.", "Loan issued by Lead Bank. Test values.")}</div></div>`;
+      }
+      case "snpl_review": {
+        const r = recOf(d.rid), rt = C.CONFIG.rates[r.country], p = state.snpl.plan;
+        return `<div class="${cls}">${head(S("Resumen con préstamo", "Summary with loan"), state.snpl.autopay ? S("Pago automático", "Autopay") : S("Sin pago automático", "No autopay"), "cyan")}${whoHTML(r)}
+          <div class="receive"><div class="lbl">${S("Recibe", "They get")}</div><div class="amt">${C.local(d.receive, r.country, prefs.lang)}</div></div>
+          <div class="rows"><div class="row"><span>${S("Envías", "You send")}</span><b>${money(d.amount)}</b></div><div class="row"><span>${S("Tipo de cambio", "Rate")}</span><b>1 USD = ${rt.rate} ${rt.cur}</b></div>
+          <div class="row"><span>${S("Pagas con préstamo", "Paid with loan")}</span><b>${money(d.amount)}</b></div><div class="row"><span>${S("Comisión del envío", "Transfer fee")}</span><b>${money(C.CONFIG.fee)}</b></div><div class="row"><span>${S("Comisión del préstamo", "Loan fee")}</span><b>${money(p.loanFee)}</b></div>
+          <div class="row total"><span>${S("Pagas hoy", "You pay today")}</span><b>${money(p.payToday)}</b></div><div class="row"><span>${S("Después", "Later")}</span><b>${p.payments} × ${money(p.each)}</b></div></div>${acts(c, S("Enviar dinero con mi préstamo", "Send with my loan"))}</div>`;
+      }
+      case "loan8_offer": case "loan8_done": {
+        const p = d.plan, done = c.type === "loan8_done";
+        return `<div class="${cls}">${head(S("Préstamo Félix", "Félix loan"), done ? S("Depositado", "Deposited") : "APR 8%", done ? "ok" : "cyan")}
+          <div class="big">${done ? "+" : ""}${money(p.amount)}</div><div class="sub">${done ? S("En tu Cuenta Félix", "In your Félix account") : S("Se deposita en tu Cuenta Félix", "Deposited to your Félix account")}</div>
+          ${done ? "" : `<div class="rows"><div class="row"><span>${S("Activación hoy", "Activation today")}</span><b>${money(p.activation)}</b></div><div class="row"><span>${S("Pagos", "Payments")}</span><b>${p.weeks} × ${money(p.each)} ${p.weeks > 1 ? S("semanales", "weekly") : ""}</b></div><div class="row total"><span>${S("Total a pagar", "Total")}</span><b>${money(p.total)}</b></div></div>${acts(c, S("Aceptar", "Accept"))}`}</div>`;
+      }
       case "bills": {
         const rows = (state.bills || []).map((b) => `<div class="it"><div><div class="t">${esc(tr(b.label))}</div><div class="d">${b.provider} · ${b.paid ? S("Pagado", "Paid") : S("Vence", "Due") + " " + esc(tr(b.due))}</div></div><span class="${b.paid ? "pos" : "neg"}">${money(b.amount)}</span></div>`).join("");
         return `<div class="${cls}">${head(S("Servicios", "Bills"), S("Luz, agua, internet", "Power, water, internet"))}<div class="list">${rows}</div></div>`;
@@ -790,6 +858,13 @@
     if (say) { userSays(say.dataset.say, "tap"); return; }
     if (e.target.closest("#btn-cc")) { prefs.captions = !prefs.captions; render(); return; }
     if (e.target.closest("#fc-mute")) { $("#btn-mute").click(); return; }
+    const sc = e.target.closest("[data-scan]");
+    if (sc) {
+      // Escaneo simulado de ID y selfie
+      if (sc.dataset.scan === "id") { state.kyc.scan = 2; render(); setTimeout(() => { state.kyc.scan = 1; render(); }, 1600); }
+      else { state.kyc.scan = 3; render(); setTimeout(() => { state.kyc.verified = true; state.kyc.scan = 4; render(); userSays(S("Listo, ya escaneé mi identificación y me tomé la selfie.", "Done, I scanned my ID and took a selfie."), "tap"); }, 1800); }
+      return;
+    }
     if (e.target.closest("#fc-help")) { $("#btn-human").click(); return; }
     if (e.target.closest("#btn-name")) { showNameGate(); return; }
     const tst = e.target.closest("[data-toast]");

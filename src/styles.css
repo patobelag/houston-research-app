@@ -254,3 +254,14 @@ input { font: inherit; color: inherit; }
 .logo-img { height: 24px; width: auto; display: block; }
 .ng-in .logo-img { height: 34px; }
 .fc .logo-img, :root[data-theme="dark"] .logo-img { filter: brightness(0) invert(1); }
+
+/* Flujos reales: escaneo de ID y métodos de pago */
+.idframe { margin: 6px 0 4px; height: 120px; border-radius: 14px; border: 2px dashed var(--accent-2); display: grid; place-items: center; color: var(--muted); font-size: 13px; position: relative; overflow: hidden; background: var(--soft); }
+.idframe.got { border-style: solid; color: var(--ok); }
+.idframe.scanning::after { content: ""; position: absolute; left: 0; right: 0; height: 3px; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: scanline 1.2s linear infinite; }
+@keyframes scanline { from { top: 0; } to { top: 100%; } }
+.scan-run { margin-top: 12px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.pm { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; margin-top: 8px; background: var(--card); color: var(--ink); }
+.pm b { display: block; font-size: 14px; }
+.pm small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pm.off { opacity: .5; }

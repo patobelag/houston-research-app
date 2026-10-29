@@ -70,3 +70,6 @@
 /* El botón de hablar solo se anima cuando habla la persona. Félix se anima en el anillo. */
 .fc .orb.speaking .core, .fc .orb.thinking .core { animation: none; }
 .fc .orb.speaking .ring, .fc .orb.thinking .ring { animation: none; opacity: 0; }
+
+.fc .fc-card .scan-acts { display: flex; }
+.fc .pm { background: #0e2826; border-color: #234743; color: #f2fbf9; }

@@ -14,7 +14,13 @@
       GT: { cur: "GTQ", rate: 7.64, sym: "Q", unit: { es: "quetzales", en: "quetzales" }, name: { es: "Guatemala", en: "Guatemala" }, flag: "🇬🇹" },
       HN: { cur: "HNL", rate: 26.87, sym: "L", unit: { es: "lempiras", en: "lempiras" }, name: { es: "Honduras", en: "Honduras" }, flag: "🇭🇳" },
     },
-    payLater: { fee: 4.99, payments: 4, everyDays: 14 }, // Envía hoy, paga después
+    payLater: { fee: 4.99, payments: 4, everyDays: 14 }, // (usuario actual, link de voz)
+    // Datos de Notion (Test Plan SNPL as a payment method): comisión del préstamo $10, 4 cuotas, pagas hoy solo comisiones
+    snpl: { loanFee: 10, payments: 4, everyDays: 14, approvedLimit: 150 },
+    // Préstamo a la cuenta (SNPL Paso a paso): 8 cuotas semanales, APR 8%, activación $1
+    loan8: { weeks: 8, activation: 1, maxFirst: 250, min: 30, table: { 100: 102.33, 150: 153.0, 200: 203.67, 250: 254.33 } },
+    cashNetworks: { MX: ["Elektra", "Coppel", "OXXO"], GT: ["Banrural", "Banco Industrial"], HN: ["Banco Atlántida", "Ficohsa"], CO: ["Efecty", "Bancolombia"] },
+    testAccounts: { MX: "002180700123456789", GT: "3012345678", HN: "21012345678", CO: "3001234567" },
     loan: { monthlyRate: 0.05, defaultMonths: 3, min: 50 }, // Crédito de consumo de bajo monto
     apy: 4,
     delivery: { onTheWayMs: 6000, deliveredMs: 18000 },
@@ -60,6 +66,8 @@
         loan: null,
         recipients: [],
         bills: [], phones: {},
+        kyc: { terms: false, fullName: "", birthDate: "", idType: "", verified: false },
+        debitCard: null, snpl: null, loan8: null,
         payday: null,
         movements: [],
         onb: { step: "recipient" },
@@ -201,6 +209,12 @@
       return { amount, months: m, cost, total, payments, each, first: addDays(TODAY(), 14) };
     }
     const creditAvailable = () => r2(state.credit.limit - state.credit.used);
+    function snplPlan(amount) {
+      const sn = CONFIG.snpl;
+      const each = r2(amount / sn.payments);
+      const dates = Array.from({ length: sn.payments }, (_, i) => addDays(TODAY(), sn.everyDays * (i + 1)));
+      return { amount, loanFee: sn.loanFee, payToday: r2(sn.loanFee + CONFIG.fee), each, payments: sn.payments, dates, total: r2(amount + sn.loanFee + CONFIG.fee) };
+    }
 
     const tools = {
       show_balance() {
@@ -297,24 +311,172 @@
         hooks.card("named", {});
         return { status: "ok", name: state.user.name };
       },
+      // ═════════ Flujos reales (link Fully conversational, usuario nuevo) ═════════
+      // ── Abrir Cuenta Félix: términos + nombre completo + fecha de nacimiento + ID y selfie (simulado) ──
+      accept_terms() {
+        state.kyc = state.kyc || {};
+        state.kyc.terms = true;
+        hooks.card("terms", { accepted: true });
+        return { status: "ok", accepted: ["Comunicaciones digitales (E-SIGN)", "Términos de la Cuenta Félix", "Términos de rendimiento"] };
+      },
+      save_identity({ full_name, birth_date } = {}) {
+        state.kyc = state.kyc || {};
+        if (full_name) state.kyc.fullName = String(full_name).trim();
+        if (birth_date) state.kyc.birthDate = String(birth_date).trim();
+        const missing = [!state.kyc.fullName && "full_name", !state.kyc.birthDate && "birth_date"].filter(Boolean);
+        if (!missing.length) hooks.card("identity", {});
+        return { status: missing.length ? "missing" : "ok", missing };
+      },
+      start_id_check({ id_type } = {}) {
+        state.kyc = state.kyc || {};
+        const ok = ["licencia", "license", "ine", "dni", "pasaporte", "passport", "matricula", "matrícula", "residencia", "permiso", "id"];
+        const t = String(id_type || "").toLowerCase();
+        if (!t) return { status: "need_id_type", accepted: ["Licencia de EE.UU.", "INE o DNI con foto", "Pasaporte o passport card", "Permiso de residencia o trabajo", "Matrícula consular"] };
+        if (!ok.some((k) => t.includes(k))) return { status: "not_accepted", accepted: ["Licencia de EE.UU.", "INE o DNI con foto", "Pasaporte o passport card", "Permiso de residencia o trabajo", "Matrícula consular"] };
+        state.kyc.idType = id_type;
+        hooks.card("id_scan", { idType: id_type });
+        return { status: "waiting_for_scan", next: "The user taps the screen to scan the ID and take a selfie. Wait for them to tell you it's done." };
+      },
+      open_account() {
+        const k = state.kyc || {};
+        if (state.account.open) return { status: "already_open" };
+        const missing = [!k.terms && "terms", !k.fullName && "full_name", !k.birthDate && "birth_date", !k.verified && "id_verification"].filter(Boolean);
+        if (missing.length) return { status: "missing", missing };
+        state.account.open = true;
+        state.account.card = { last4: "3307", frozen: false, virtual: true };
+        state.flags.opened = true;
+        hooks.card("account_opened", {});
+        return { status: "opened", card_last4: "3307", card: "virtual Visa debit, physical one arrives by mail", balance: 0 };
+      },
+      // ── Tarjeta de débito para pagar (simulada) ──
+      add_debit_card() {
+        state.debitCard = { brand: "Visa", last4: "4242", bank: "Chase" };
+        hooks.card("debit_added", {});
+        return { status: "ok", card: "Chase Visa debit ••4242 (test)" };
+      },
+      // ── Métodos de pago de una remesa: débito, saldo o Envía ahora, paga después ──
+      payment_options({ recipient, amount_usd } = {}) {
+        const r = resolveRecipient(state, recipient || "");
+        if (!r) return { status: "need_recipient" };
+        const amount = r2(Number(amount_usd || 0));
+        if (!amount) return { status: "need_amount" };
+        const total = r2(amount + CONFIG.fee);
+        const sn = CONFIG.snpl;
+        const verified = !!(state.kyc && state.kyc.verified);
+        const opts = {
+          debit_card: state.debitCard ? { available: true, card: "••" + state.debitCard.last4 } : { available: false, reason: "no_debit_card_yet (use add_debit_card)" },
+          balance: { available: state.account.open && state.account.balance >= total, balance: state.account.balance },
+          snpl: (() => {
+            if (!verified) return { available: false, reason: "identity_not_verified" };
+            if (!state.debitCard) return { available: false, reason: "needs_debit_card_for_fees" };
+            if (state.snplActive) return { available: false, reason: "one_active_loan_at_a_time" };
+            if (amount > sn.approvedLimit) return { available: false, reason: "over_approved_amount", approved_amount_usd: sn.approvedLimit };
+            return { available: true, approved_amount_usd: sn.approvedLimit };
+          })(),
+        };
+        hooks.card("pay_methods", { rid: r.id, amount, opts });
+        return { status: "ok", amount_usd: amount, fee_usd: CONFIG.fee, total_usd: total, options: opts };
+      },
+      review_transfer({ recipient, amount_usd, amount_local, pay_with } = {}) {
+        const r = resolveRecipient(state, recipient || "");
+        if (!r) return { status: "need_recipient" };
+        const rate = CONFIG.rates[r.country].rate;
+        let amount = amount_usd ? Number(amount_usd) : amount_local ? Number(amount_local) / rate : 0;
+        amount = r2(amount);
+        if (!amount) return { status: "need_amount" };
+        const via = /bal|saldo|cuenta/i.test(pay_with || "") ? "balance" : "debit_card";
+        const total = r2(amount + CONFIG.fee);
+        if (via === "debit_card" && !state.debitCard) return { status: "no_debit_card" };
+        if (via === "balance" && state.account.balance < total) return { status: "insufficient_balance", balance: state.account.balance };
+        const receive = r2(amount * rate);
+        const cardId = hooks.card("review", { rid: r.id, amount, receive, total, fee: CONFIG.fee, via });
+        state.pending = { type: "send", rid: r.id, amount, receive, total, cardId, via };
+        return { status: "ready", recipient: r.name, amount_usd: amount, fee_usd: CONFIG.fee, total_usd: total, receives_local: receive, currency: CONFIG.rates[r.country].cur, rate, pay_with: via, needs_confirmation: true };
+      },
+      // ── Envía ahora, paga después (SNPL) como método de pago ──
+      snpl_start({ recipient, amount_usd } = {}) {
+        const o = tools.payment_options({ recipient, amount_usd });
+        if (o.status !== "ok") return o;
+        const sn = o.options.snpl;
+        if (!sn.available) return { status: "not_available", reason: sn.reason, approved_amount_usd: CONFIG.snpl.approvedLimit };
+        const r = resolveRecipient(state, recipient);
+        state.snpl = { rid: r.id, amount: r2(Number(amount_usd)), step: "address", address: "", esign: false, approved: false, termsOk: false, autopay: null };
+        hooks.card("snpl_intro", { rid: r.id, amount: state.snpl.amount });
+        return { status: "started", steps: ["address_and_esign", "submit_application", "approved", "loan_terms", "autopay_choice", "review_and_confirm"], next: "Ask for their US home address (test data) and their consent to e-sign." };
+      },
+      snpl_submit_application({ address, esign_accepted } = {}) {
+        const sp = state.snpl;
+        if (!sp) return { status: "not_started" };
+        if (address) sp.address = String(address);
+        if (esign_accepted) sp.esign = true;
+        if (!sp.address) return { status: "need_address" };
+        if (/p\.?\s*o\.?\s*box|apartado postal/i.test(sp.address)) return { status: "po_box_not_allowed" };
+        if (!sp.esign) return { status: "need_esign" };
+        sp.approved = true; sp.step = "terms";
+        const plan = snplPlan(sp.amount);
+        sp.plan = plan;
+        hooks.card("snpl_terms", {});
+        return { status: "approved", loan_amount_usd: sp.amount, loan_fee_usd: plan.loanFee, send_fee_usd: CONFIG.fee, pay_today_usd: plan.payToday, installments: plan.payments, installment_usd: plan.each, total_usd: plan.total, first_payment: dateLabel(plan.dates[0], lang()), lender_note: "Préstamo otorgado por Lead Bank (prototipo)" };
+      },
+      snpl_accept_terms({ accepted, autopay } = {}) {
+        const sp = state.snpl;
+        if (!sp || !sp.approved) return { status: "not_approved_yet" };
+        if (!accepted) return { status: "need_acceptance" };
+        sp.termsOk = true;
+        if (autopay === undefined || autopay === null || autopay === "") return { status: "need_autopay_choice", options: ["Con pago automático", "Sin pago automático"] };
+        sp.autopay = autopay === true || /^(true|s[ií]|con|yes)/i.test(String(autopay));
+        const r = state.recipients.find((x) => x.id === sp.rid);
+        const receive = r2(sp.amount * CONFIG.rates[r.country].rate);
+        const cardId = hooks.card("snpl_review", { rid: sp.rid, amount: sp.amount, receive });
+        state.pending = { type: "snpl_send", rid: sp.rid, amount: sp.amount, receive, cardId };
+        return { status: "ready", pay_today_usd: sp.plan.payToday, paid_with_loan_usd: sp.amount, receives_local: receive, currency: CONFIG.rates[r.country].cur, installments: sp.plan.payments, installment_usd: sp.plan.each, total_usd: sp.plan.total, autopay: sp.autopay, needs_confirmation: true };
+      },
+      // ── Préstamo a tu Cuenta Félix (8 cuotas semanales, APR 8%) ──
+      offer_cash_loan({ amount_usd } = {}) {
+        const L = CONFIG.loan8;
+        if (!(state.kyc && state.kyc.verified)) return { status: "identity_not_verified" };
+        if (!state.account.open) return { status: "no_account" };
+        if (!amount_usd) return { status: "need_amount", min: L.min, max: L.maxFirst, examples: L.table };
+        const amount = r2(Number(amount_usd));
+        if (amount > L.maxFirst) return { status: "over_max", max: L.maxFirst };
+        if (amount < L.min) return { status: "below_min", min: L.min };
+        const total = L.table[amount] || r2(amount * 1.0175 + 0.5);
+        const short = amount <= 70;
+        const eachT = { 100: 12.54, 150: 18.88, 200: 25.21, 250: 31.54 }[amount];
+        const plan = { amount, total, weeks: short ? 1 : L.weeks, each: short ? total : (eachT || r2(total / L.weeks)), activation: L.activation, first: addDays(TODAY(), 7), apr: 8 };
+        if (!state.debitCard) return { status: "needs_debit_card_for_activation", plan };
+        const cardId = hooks.card("loan8_offer", { plan });
+        state.pending = { type: "loan8", plan, cardId };
+        return { status: "ready", amount_usd: amount, activation_today_usd: L.activation, weekly_payments: plan.weeks, payment_usd: plan.each, total_usd: total, apr: "8%", deposit_to: "Cuenta Félix", needs_confirmation: true };
+      },
+
       // ── Destinatario nuevo, dicho de cero ──
-      add_recipient({ name, relation, country, city, method, bank } = {}) {
-        if (!name && !relation) return { status: "need_name" };
+      add_recipient({ name, full_name, relation, country, city, method, bank, account_number, use_test_account, cash_network } = {}) {
+        const nm = String(full_name || name || "").trim();
+        if (!nm) return { status: "need_full_name" };
         const rel = relation ? (REL[norm(relation)] || findRelation(norm(relation))) : null;
         const c = findCity(norm(city || "")) || findCity(norm(country || ""));
-        const cc = c ? c.country : (/guate/i.test(country || "") ? "GT" : /hond/i.test(country || "") ? "HN" : /colom/i.test(country || "") ? "CO" : "MX");
-        const nm = String(name || (rel ? rel.label.es : "Familiar")).trim();
-        const id = norm(nm).replace(/\s/g, "") || (rel ? rel.key : "familiar");
-        const m = /cash|efectivo|tienda|oxxo|elektra|retiro/i.test(method || "") ? "cash" : "bank";
+        const cc = c ? c.country : (/guate/i.test(country || "") ? "GT" : /hond/i.test(country || "") ? "HN" : /colom/i.test(country || "") ? "CO" : /m[eé]x/i.test(country || "") ? "MX" : null);
+        if (!cc) return { status: "need_country", options: ["México", "Guatemala", "Honduras", "Colombia"] };
+        if (!method) return { status: "need_method", options: ["bank (depósito a cuenta)", "cash (retiro en efectivo)"], cash_networks: CONFIG.cashNetworks[cc] };
+        const m = /cash|efectivo|tienda|oxxo|elektra|coppel|retiro/i.test(method) ? "cash" : "bank";
+        let acct = account_number ? String(account_number).replace(/\D/g, "") : "";
+        if (m === "bank" && !acct && use_test_account) acct = CONFIG.testAccounts[cc];
+        if (m === "bank" && !bank) return { status: "need_bank", note: cc === "MX" ? "Pide el banco y la CLABE de 18 dígitos" : "Pide el banco y el número de cuenta" };
+        if (m === "bank" && !acct) return { status: "need_account_number", format: cc === "MX" ? "CLABE de 18 dígitos" : "número de cuenta", tip: "Si es prueba, usa use_test_account=true" };
+        if (m === "bank" && cc === "MX" && acct.length !== 18) return { status: "invalid_clabe", tip: "La CLABE tiene 18 dígitos. Usa use_test_account=true para una de prueba." };
+        const net = m === "cash" ? (CONFIG.cashNetworks[cc] || []).find((n) => norm(cash_network || "").includes(norm(n))) || (CONFIG.cashNetworks[cc] || ["red de pago"])[0] : null;
+        const id = norm(nm).replace(/\s/g, "") || "familiar";
+        const first = /^(don|doña|tía|tío|sra|sr)\b/i.test(nm) ? nm.split(" ").slice(0, 2).join(" ") : nm.split(" ")[0];
         const rec = {
-          id, rel: rel ? rel.key : null, name: nm, short: { es: /^(don|doña|tía|tío|sra|sr)\b/i.test(nm) ? nm : nm.split(" ")[0], en: /^(don|doña|tía|tío|sra|sr)\b/i.test(nm) ? nm : nm.split(" ")[0] },
+          id, rel: rel ? rel.key : null, name: nm, short: { es: first, en: first },
           city: c ? c.label : (city || CONFIG.rates[cc].name.es), country: cc,
-          method: m === "cash" ? { es: "Efectivo · " + (cc === "MX" ? "Elektra" : cc === "GT" ? "Banrural" : "Banco local"), en: "Cash pickup" } : { es: "Depósito a cuenta" + (bank ? " · " + bank : ""), en: "Bank deposit" + (bank ? " · " + bank : "") },
-          isNew: true,
+          method: m === "cash" ? { es: "Efectivo · " + net, en: "Cash pickup · " + net } : { es: `${bank} · ••${acct.slice(-4)}`, en: `${bank} · ••${acct.slice(-4)}` },
+          payout: m, isNew: true,
         };
         state.recipients = state.recipients.filter((x) => x.id !== id).concat(rec);
         hooks.card("recipient_saved", { rid: id });
-        return { status: "ok", recipient_id: id, name: nm, country: cc, currency: CONFIG.rates[cc].cur, method: m };
+        return { status: "ok", recipient_id: id, name: nm, country: cc, currency: CONFIG.rates[cc].cur, method: m, detail: tr(rec.method, "es"), cash_note: m === "cash" ? "La persona debe llevar su identificación oficial para cobrar." : undefined };
       },
       save_payday({ payday } = {}) {
         state.payday = payday || { es: "Sin definir", en: "Not set" };
@@ -414,7 +576,7 @@
         const lg = lang();
         if (p.type === "send" || p.type === "paylater") {
           const r = state.recipients.find((x) => x.id === p.rid);
-          if (p.type === "send") state.account.balance = r2(state.account.balance - p.total);
+          if (p.type === "send") { if (p.via !== "debit_card") state.account.balance = r2(state.account.balance - p.total); }
           else state.credit.used = r2(state.credit.used + p.plan.total);
           const tid = nextId("t");
           state.transfers[tid] = { id: tid, rid: p.rid, amount: p.amount, receive: p.receive, step: 0, via: p.type, ref: "FX" + (480210 + state.seq) };
@@ -433,6 +595,30 @@
             });
           });
           return { status: "sent", transfer_id: tid, recipient_id: p.rid, arrives_in: "minutes", balance: state.account.balance, via: p.type };
+        }
+        if (p.type === "snpl_send") {
+          const r = state.recipients.find((x) => x.id === p.rid);
+          const sp = state.snpl;
+          state.snplActive = true;
+          const tid = nextId("t");
+          state.transfers[tid] = { id: tid, rid: p.rid, amount: p.amount, receive: p.receive, step: 0, via: "snpl", ref: "FX" + (480210 + state.seq) };
+          state.movements.unshift({ id: tid, kind: "out", title: { es: `Envío a ${tr(r.short, "es")}`, en: `Transfer to ${tr(r.short, "en")}` }, date: { es: "Hoy", en: "Today" }, amount: -sp.plan.payToday, note: { es: "Envía ahora, paga después", en: "Send now, pay later" } });
+          state.flags.sent = (state.flags.sent || 0) + 1; state.flags.paylater = true;
+          const cid = hooks.card("tracking", { tid });
+          hooks.later(CONFIG.delivery.onTheWayMs, () => { state.transfers[tid].step = 1; hooks.update(cid, {}); });
+          hooks.later(CONFIG.delivery.deliveredMs, () => {
+            state.transfers[tid].step = 2; hooks.update(cid, {});
+            hooks.notify({ es: `Ya llegó. ${r.name.split(" ")[0]} recibió ${localSpoken(p.receive, r.country, "es")}.`, en: `It arrived. ${r.name.split(" ")[0]} got ${localSpoken(p.receive, r.country, "en")}.` });
+          });
+          return { status: "sent", via: "snpl", charged_today_usd: sp.plan.payToday, installments: sp.plan.payments, installment_usd: sp.plan.each, first_payment: dateLabel(sp.plan.dates[0], lg), autopay: sp.autopay };
+        }
+        if (p.type === "loan8") {
+          state.account.balance = r2(state.account.balance + p.plan.amount);
+          state.loan8 = p.plan;
+          state.movements.unshift({ id: nextId("m"), kind: "in", title: { es: "Préstamo Félix", en: "Félix loan" }, date: { es: "Hoy", en: "Today" }, amount: p.plan.amount });
+          state.flags.loan = true;
+          hooks.card("loan8_done", { plan: p.plan });
+          return { status: "disbursed", amount_usd: p.plan.amount, balance_usd: state.account.balance, activation_charged_usd: p.plan.activation, first_payment: dateLabel(p.plan.first, lg) };
         }
         if (p.type === "loan") {
           state.account.balance = r2(state.account.balance + p.plan.amount);
