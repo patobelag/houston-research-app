@@ -349,10 +349,11 @@
         return { status: "opened", card_last4: "3307", card: "virtual Visa debit, physical one arrives by mail", balance: 0 };
       },
       // ── Tarjeta de débito para pagar (simulada) ──
-      add_debit_card() {
-        state.debitCard = { brand: "Visa", last4: "4242", bank: "Chase" };
+      add_debit_card({ brand } = {}) {
+        const mc = /master/i.test(brand || "");
+        state.debitCard = { brand: mc ? "Mastercard" : "Visa", last4: mc ? "5454" : "4242" };
         hooks.card("debit_added", {});
-        return { status: "ok", card: "Chase Visa debit ••4242 (test)" };
+        return { status: "ok", card: `${state.debitCard.brand} ••${state.debitCard.last4}` };
       },
       // ── Métodos de pago de una remesa: débito, saldo o Envía ahora, paga después ──
       payment_options({ recipient, amount_usd } = {}) {
@@ -364,7 +365,8 @@
         const sn = CONFIG.snpl;
         const verified = !!(state.kyc && state.kyc.verified);
         const opts = {
-          debit_card: state.debitCard ? { available: true, card: "••" + state.debitCard.last4 } : { available: false, reason: "no_debit_card_yet (use add_debit_card)" },
+          debit_card: state.debitCard ? { available: true, card: state.debitCard.brand + " ••" + state.debitCard.last4 } : { available: true, needs_card: true, note: "Ask Visa or Mastercard, then add_debit_card" },
+          apple_pay: { available: true },
           balance: { available: state.account.open && state.account.balance >= total, balance: state.account.balance },
           snpl: (() => {
             if (!verified) return { available: false, reason: "identity_not_verified" };
@@ -384,7 +386,7 @@
         let amount = amount_usd ? Number(amount_usd) : amount_local ? Number(amount_local) / rate : 0;
         amount = r2(amount);
         if (!amount) return { status: "need_amount" };
-        const via = /bal|saldo|cuenta/i.test(pay_with || "") ? "balance" : "debit_card";
+        const via = /apple/i.test(pay_with || "") ? "apple_pay" : /bal|saldo|cuenta/i.test(pay_with || "") ? "balance" : "debit_card";
         const total = r2(amount + CONFIG.fee);
         if (via === "debit_card" && !state.debitCard) return { status: "no_debit_card" };
         if (via === "balance" && state.account.balance < total) return { status: "insufficient_balance", balance: state.account.balance };
@@ -402,7 +404,7 @@
         const r = resolveRecipient(state, recipient);
         state.snpl = { rid: r.id, amount: r2(Number(amount_usd)), step: "address", address: "", esign: false, approved: false, termsOk: false, autopay: null };
         hooks.card("snpl_intro", { rid: r.id, amount: state.snpl.amount });
-        return { status: "started", steps: ["address_and_esign", "submit_application", "approved", "loan_terms", "autopay_choice", "review_and_confirm"], next: "Ask for their US home address (test data) and their consent to e-sign." };
+        return { status: "started", steps: ["address_and_esign", "submit_application", "approved", "loan_terms", "autopay_choice", "review_and_confirm"], next: "Ask for their US home address and their consent to e-sign." };
       },
       snpl_submit_application({ address, esign_accepted } = {}) {
         const sp = state.snpl;
@@ -416,7 +418,7 @@
         const plan = snplPlan(sp.amount);
         sp.plan = plan;
         hooks.card("snpl_terms", {});
-        return { status: "approved", loan_amount_usd: sp.amount, loan_fee_usd: plan.loanFee, send_fee_usd: CONFIG.fee, pay_today_usd: plan.payToday, installments: plan.payments, installment_usd: plan.each, total_usd: plan.total, first_payment: dateLabel(plan.dates[0], lang()), lender_note: "Préstamo otorgado por Lead Bank (prototipo)" };
+        return { status: "approved", loan_amount_usd: sp.amount, loan_fee_usd: plan.loanFee, send_fee_usd: CONFIG.fee, pay_today_usd: plan.payToday, installments: plan.payments, installment_usd: plan.each, total_usd: plan.total, first_payment: dateLabel(plan.dates[0], lang()), lender_note: "Préstamo otorgado por Lead Bank" };
       },
       snpl_accept_terms({ accepted, autopay } = {}) {
         const sp = state.snpl;
@@ -576,10 +578,10 @@
         const lg = lang();
         if (p.type === "send" || p.type === "paylater") {
           const r = state.recipients.find((x) => x.id === p.rid);
-          if (p.type === "send") { if (p.via !== "debit_card") state.account.balance = r2(state.account.balance - p.total); }
+          if (p.type === "send") { if (!p.via || p.via === "balance") state.account.balance = r2(state.account.balance - p.total); }
           else state.credit.used = r2(state.credit.used + p.plan.total);
           const tid = nextId("t");
-          state.transfers[tid] = { id: tid, rid: p.rid, amount: p.amount, receive: p.receive, step: 0, via: p.type, ref: "FX" + (480210 + state.seq) };
+          state.transfers[tid] = { id: tid, rid: p.rid, amount: p.amount, receive: p.receive, step: 0, via: p.type, pay: p.via, ref: "FX" + (480210 + state.seq) };
           state.movements.unshift({ id: tid, kind: "out", title: { es: `Envío a ${tr(r.short, "es")}`, en: `Transfer to ${tr(r.short, "en")}` }, date: { es: "Hoy", en: "Today" }, amount: -(p.type === "send" ? p.total : r2(p.amount + CONFIG.fee)), note: p.type === "paylater" ? { es: "Paga después", en: "Pay later" } : null });
           state.flags.sent = (state.flags.sent || 0) + 1;
           if (p.type === "paylater") state.flags.paylater = true;

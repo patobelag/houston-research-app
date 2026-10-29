@@ -23,7 +23,7 @@
       srOk: "Reconocimiento de voz disponible", srNo: "Sin reconocimiento de voz en este navegador",
       confirm: "Confirmar", cancel: "Cancelar", done: "Hecho", cancelled: "Cancelado",
       sayConfirm: "Sí, confirmo", sayCancel: "Cancelar", shared: "Comprobante copiado",
-      share: "Compartir comprobante", waOpen: "En la prueba real se abriría WhatsApp", openAcc: "Abrir mi cuenta", notNow: "Ahora no",
+      share: "Compartir comprobante", waOpen: "Te llevamos a WhatsApp", openAcc: "Abrir mi cuenta", notNow: "Ahora no",
       elNotSet: "sin configurar", connecting: "Conectando con Félix…", tapToEnd: "Te escucho · toca para terminar", talkToInterrupt: "Habla para interrumpirlo",
       elFail: "Félix no pudo conectarse a ElevenLabs (revisa los créditos). Sigo con la voz del navegador.", elCode: "Este link necesita un código de acceso.",
       engEl: "Voz natural con ElevenLabs. Toca para hablar y toca otra vez para que Félix responda.",
@@ -45,7 +45,7 @@
       srOk: "Speech recognition available", srNo: "No speech recognition in this browser",
       confirm: "Confirm", cancel: "Cancel", done: "Done", cancelled: "Cancelled",
       sayConfirm: "Yes, confirm", sayCancel: "Cancel", shared: "Receipt copied",
-      share: "Share receipt", waOpen: "In the real app WhatsApp would open", openAcc: "Open my account", notNow: "Not now",
+      share: "Share receipt", waOpen: "Taking you to WhatsApp", openAcc: "Open my account", notNow: "Not now",
       elNotSet: "not set", connecting: "Connecting to Félix…", tapToEnd: "Listening · tap to end", talkToInterrupt: "Talk to interrupt",
       elFail: "I couldn't connect to ElevenLabs. Using the browser voice.", elCode: "This link needs an access code.",
       engEl: "Natural voice with ElevenLabs. Tap to talk, tap again for Félix to answer.",
@@ -93,8 +93,8 @@
   function introFC() {
     const n = state.user.name;
     return S(
-      `Hola${n ? " " + n : ""}, soy Félix, tu compañero para tu dinero. Conmigo abres tu cuenta con tarjeta de débito, mandas dinero a tu familia, pides un crédito, pagas servicios y recargas celulares. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ${n ? "¿Con qué te ayudo hoy?" : "Para empezar, ¿cómo te llamas?"}`,
-      `Hi${n ? " " + n : ""}, I'm Félix, your money companion. With me you open your account with a debit card, send money to your family, get a loan, pay bills and top up phones. To talk to me, tap the button and speak; when you're done, tap it again. ${n ? "What can I help you with today?" : "To start, what's your name?"}`);
+      `Hola${n ? " " + n : ""}, soy Félix, tu compañero para tu dinero. Conmigo mandas dinero a tu familia, pides un crédito, pagas servicios, recargas celulares y, si quieres, abres tu cuenta con tarjeta de débito. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ${n ? "¿Con qué te ayudo hoy?" : "Para empezar, ¿cómo te llamas?"}`,
+      `Hi${n ? " " + n : ""}, I'm Félix, your money companion. With me you send money to your family, get a loan, pay bills, top up phones and, if you want, open your account with a debit card. To talk to me, tap the button and speak; when you're done, tap it again. ${n ? "What can I help you with today?" : "To start, what's your name?"}`);
   }
 
   // ───────── Sesión ─────────
@@ -311,7 +311,21 @@
   const SDK_URL = "https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm";
   const EL = (() => {
     let conv = null, mod = null, buf = [], flushT = 0, greeting = null, raf = 0, startedAt = 0, micOpen = false, muteT = 0;
-    function enforceMute() { if (conv && !micOpen) { try { const r = conv.setMicMuted(true); if (r && r.catch) r.catch(() => {}); } catch (e) {} } }
+    // Doble candado del micrófono: además de setMicMuted, apagamos las pistas de audio en el navegador.
+    // Una pista apagada manda silencio, así Félix no escucha nada si no tocaste el botón.
+    const micTracks = new Set();
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !navigator.mediaDevices.__felixPatched) {
+      const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = async (c) => {
+        const st = await gum(c);
+        st.getAudioTracks().forEach((tk) => { micTracks.add(tk); tk.enabled = micOpen; tk.addEventListener("ended", () => micTracks.delete(tk)); });
+        return st;
+      };
+      navigator.mediaDevices.__felixPatched = true;
+    }
+    let micClosedAt = 0;
+    function setTracks(on) { micTracks.forEach((tk) => { if (tk.readyState === "live") tk.enabled = on; }); }
+    function enforceMute() { if (!micOpen) setTracks(false); if (conv && !micOpen) { try { const r = conv.setMicMuted(true); if (r && r.catch) r.catch(() => {}); } catch (e) {} } }
     const api = { connecting: false, lastTyped: null };
 
     function contextString() {
@@ -326,7 +340,7 @@
         `Tarjeta de débito Visa •••• ${s.account.card ? s.account.card.last4 : "-"}${s.account.card && s.account.card.frozen ? " (congelada)" : " (activa)"}.`,
         s.loan ? `Préstamo activo: cuota ${s.loan.paid + 1} de ${s.loan.n}, $${s.loan.installment}, vence ${s.loan.due.es}.` : "Sin préstamo activo.",
         s.kyc ? `KYC: términos ${s.kyc.terms ? "aceptados" : "pendientes"}; nombre completo ${s.kyc.fullName || "pendiente"}; fecha de nacimiento ${s.kyc.birthDate || "pendiente"}; identificación ${s.kyc.verified ? "verificada" : s.kyc.idType ? "escaneo pendiente" : "pendiente"}.` : "",
-        `Tarjeta de débito para pagar: ${s.debitCard ? "Visa ••" + s.debitCard.last4 : "no agregada"}.`,
+        `Tarjeta para pagar: ${s.debitCard ? s.debitCard.brand + " ••" + s.debitCard.last4 : "no agregada"}. Apple Pay disponible.`,
         s.snplActive ? "Tiene un préstamo Envía ahora, paga después activo (solo uno a la vez)." : "",
         `Servicios pendientes: ${(s.bills || []).filter((b) => !b.paid).map((b) => `${b.label.es} (${b.provider}) $${b.amount}, vence ${b.due.es}`).join("; ") || "ninguno"}.`,
         `Día de pago: ${s.payday ? tr(s.payday) : "no definido"}.`,
@@ -380,7 +394,7 @@
       setStatus("thinking"); $("#hint").textContent = t("connecting");
       try {
         mod = mod || (await import(SDK_URL));
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach((tk) => tk.stop());
         const r = await fetch("/api/el-token", { headers: accessCode ? { "x-access-code": accessCode } : {} });
         if (r.status === 401) { toast(t("elCode")); throw new Error("code"); }
         if (!r.ok) throw new Error("token " + r.status);
@@ -401,6 +415,8 @@
             if (!text) return;
             if (who === "user") {
               if (/^[.\s…]*$/.test(text)) return; // silencio: el micrófono estaba cerrado
+              // Algo llegó por voz sin que la persona tocara el botón: no lo mostramos y Félix lo ignora
+              if (!micOpen && !api.lastTyped && Date.now() - micClosedAt > 3000) { api.context("Ignore the previous user audio: the microphone button was not pressed, it was background noise. Do not answer it."); return; }
               if (api.lastTyped && api.lastTyped.trim() === text) { api.lastTyped = null; return; }
               msgs.push({ role: "user", text, via: "voz" }); setCaption(""); render();
             } else {
@@ -449,6 +465,8 @@
     api.toggleMic = () => {
       if (!conv) return;
       micOpen = !micOpen;
+      if (!micOpen) micClosedAt = Date.now();
+      setTracks(micOpen);
       try { conv.setMicMuted(!micOpen); } catch (e) {}
       setStatus(micOpen ? "listening" : "thinking");
       if (!micOpen) setTimeout(() => { if (status === "thinking" && !micOpen) setStatus("idle"); }, 12000);
@@ -583,7 +601,7 @@
     if (FC && state.snpl && state.snpl.termsOk && state.snpl.autopay === null && !state.pending) return [[S("Con pago automático", "With autopay")], [S("Sin pago automático", "Without autopay")]];
     if (FC) return state.account.open
       ? [[S("Mandar dinero", "Send money")], [S("Envía ahora, paga después", "Send now, pay later")], [S("Pedir un préstamo", "Get a loan")], [S("Cargar dinero", "Add money")]]
-      : [[S("Abrir mi cuenta", "Open my account")], [S("Mandar dinero", "Send money")], [S("Envía ahora, paga después", "Send now, pay later")], [S("Pedir un préstamo", "Get a loan")]];
+      : [[S("Mandar dinero", "Send money")], [S("¿A cómo está el dólar?", "What's the exchange rate?")], [S("Pedir un préstamo", "Get a loan")], [S("Abrir mi cuenta", "Open my account")]];
     return [[S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?")], [S("Mándale $100 a mi mamá", "Send Mom $100")], [S("Quiero cargar dinero", "I want to add money")], [S("Envía hoy y paga después", "Send now, pay later")]];
   }
   function renderChips() {
@@ -606,10 +624,10 @@
   function renderSides() {
     const groups = FC ? [
       [S("1 · Presentarse", "1 · Introduce yourself"), [S("Me llamo Ana", "My name is Ana")]],
-      [S("2 · Abrir cuenta (datos de prueba)", "2 · Open account (test data)"), [S("Quiero abrir mi cuenta", "I want to open my account"), S("Sí, acepto", "Yes, I accept"), S("Me llamo Ana Prueba López y nací el 3 de mayo de 1990", "My name is Ana Test Lopez, born May 3, 1990"), S("Tengo matrícula consular", "I have a consular ID")]],
-      [S("3 · Enviar a alguien nuevo", "3 · Send to someone new"), [S("Quiero mandar 100 dólares a México", "I want to send $100 to Mexico"), S("Se llama Lupe Martínez y vive en Puebla", "Her name is Lupe Martinez, she lives in Puebla"), S("A su cuenta de BBVA, usa una CLABE de prueba", "To her BBVA account, use a test CLABE"), S("Que lo cobre en efectivo en Elektra", "Cash pickup at Elektra")]],
-      [S("4 · Pagar", "4 · Pay"), [S("Agrega mi tarjeta de débito", "Add my debit card"), S("Con mi tarjeta de débito", "With my debit card"), S("Envía ahora, paga después", "Send now, pay later"), S("Mi dirección es 123 Main Street, Houston", "My address is 123 Main Street, Houston"), S("Sí, acepto firmar", "Yes, I agree to sign"), S("Sin pago automático", "Without autopay")]],
-      [S("5 · Préstamo a tu cuenta", "5 · Loan to your account"), [S("Quiero un préstamo de 150 dólares", "I want a $150 loan")]],
+      [S("2 · Enviar a alguien nuevo (sin cuenta)", "2 · Send to someone new (no account)"), [S("Quiero mandar 100 dólares a México", "I want to send $100 to Mexico"), S("Se llama Lupe Martínez y vive en Puebla", "Her name is Lupe Martinez, she lives in Puebla"), S("A su cuenta de BBVA, la CLABE es 002180700123456789", "To her BBVA account, CLABE 002180700123456789"), S("Que lo cobre en efectivo en Elektra", "Cash pickup at Elektra")]],
+      [S("3 · Pagar el envío", "3 · Pay for the transfer"), [S("Con mi tarjeta Visa", "With my Visa card"), S("Con Mastercard", "With Mastercard"), S("Con Apple Pay", "With Apple Pay"), S("Sí, envíalo", "Yes, send it")]],
+      [S("4 · Abrir cuenta (si la pide)", "4 · Open account (if asked)"), [S("Quiero abrir mi cuenta", "I want to open my account"), S("Sí, acepto", "Yes, I accept"), S("Me llamo Ana Prueba López y nací el 3 de mayo de 1990", "My name is Ana Test Lopez, born May 3, 1990"), S("Tengo matrícula consular", "I have a consular ID")]],
+      [S("5 · Envía ahora, paga después y préstamo (con cuenta)", "5 · Send now, pay later and loan (with account)"), [S("Envía ahora, paga después", "Send now, pay later"), S("Mi dirección es 123 Main Street, Houston", "My address is 123 Main Street, Houston"), S("Sí, acepto firmar", "Yes, I agree to sign"), S("Sin pago automático", "Without autopay"), S("Quiero un préstamo de 150 dólares", "I want a $150 loan")]],
     ] : [
       [S("1 · Remesa con calculadora", "1 · Remittance + calculator"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does my mom get if I send $200?"), S("¿Y si mando 300?", "And if I send $300?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100")]],
       [S("2 · Cargar dinero", "2 · Add money"), [S("Quiero cargar 200 dólares a mi cuenta", "I want to add $200 to my account")]],
@@ -706,7 +724,7 @@
           <div class="row"><span>${S("Primer pago", "First payment")}</span><b>${C.dateLabel(new Date(p.first), prefs.lang)}</b></div>
           <div class="row"><span>${S("Costo del crédito", "Cost of credit")}</span><b>${money(p.cost)}</b></div>
           <div class="row total"><span>${S("Total a pagar", "Total to repay")}</span><b>${money(p.total)}</b></div></div>
-          <div class="note">${S("Valores de prueba para el prototipo.", "Test values for the prototype.")}</div>${acts(c, S("Aceptar", "Accept"))}</div>`;
+          ${acts(c, S("Aceptar", "Accept"))}</div>`;
       }
       case "loan_done":
         return `<div class="${cls}">${head(S("Crédito Félix", "Félix loan"), S("Depositado", "Deposited"), "ok")}<div class="big">+${money(d.plan.amount)}</div><div class="sub">${S("Nuevo saldo", "New balance")}: ${money(state.account.balance)}</div></div>`;
@@ -759,7 +777,7 @@
       case "terms":
         return `<div class="${cls}">${head(S("Términos", "Terms"), S("Aceptados", "Accepted"), "ok")}<div class="bullets">${[S("Comunicaciones digitales (E-SIGN)", "Digital communications (E-SIGN)"), S("Términos de la Cuenta Félix", "Félix Account terms"), S("Términos de rendimiento", "Yield terms")].map((x) => `<div>${I("check", 16, 2.6)}${x}</div>`).join("")}</div></div>`;
       case "identity":
-        return `<div class="${cls}">${head(S("Tus datos", "Your details"), S("Prueba", "Test"))}<div class="rows"><div class="row"><span>${S("Nombre completo", "Full name")}</span><b>${esc(state.kyc.fullName)}</b></div><div class="row"><span>${S("Fecha de nacimiento", "Date of birth")}</span><b>${esc(state.kyc.birthDate)}</b></div></div></div>`;
+        return `<div class="${cls}">${head(S("Tus datos", "Your details"))}<div class="rows"><div class="row"><span>${S("Nombre completo", "Full name")}</span><b>${esc(state.kyc.fullName)}</b></div><div class="row"><span>${S("Fecha de nacimiento", "Date of birth")}</span><b>${esc(state.kyc.birthDate)}</b></div></div></div>`;
       case "id_scan": {
         const v = state.kyc.verified, st = state.kyc.scan || 0;
         const btn = v ? `<div class="done-note">${I("check", 16, 2.6)} ${S("Identidad verificada", "Identity verified")}</div>`
@@ -771,13 +789,14 @@
           <div class="note">${S("Simulado: no se guarda ninguna foto.", "Simulated: no photo is stored.")}</div>${btn}</div>`;
       }
       case "debit_added":
-        return `<div class="${cls}">${head(S("Tarjeta de débito", "Debit card"), S("Agregada", "Added"), "ok")}<div class="who"><div class="ini">VISA</div><div><div class="nm">Chase Visa •••• 4242</div><div class="ds">${S("Tarjeta de prueba", "Test card")}</div></div></div></div>`;
+        return `<div class="${cls}">${head(S("Tarjeta agregada", "Card added"), S("Lista", "Ready"), "ok")}<div class="who"><div class="ini">${state.debitCard.brand === "Mastercard" ? "MC" : "VISA"}</div><div><div class="nm">${state.debitCard.brand} •••• ${state.debitCard.last4}</div><div class="ds">${S("Para pagar tus envíos", "To pay for your transfers")}</div></div></div></div>`;
       case "pay_methods": {
         const o = d.opts, r = recOf(d.rid);
         const row = (key, title, sub, ok) => `<button class="pm ${ok ? "" : "off"}" ${ok ? `data-say="${esc(title)}"` : "disabled"}><span><b>${title}</b><small>${sub}</small></span>${ok ? I("send", 16, 2) : ""}</button>`;
         return `<div class="${cls}">${head(S("Elige tu forma de pago", "Choose how to pay"), money(d.amount + C.CONFIG.fee))}
-          ${row("debit", S("Con mi tarjeta de débito", "With my debit card"), o.debit_card.available ? "Visa ••4242" : S("Agrega una tarjeta", "Add a card"), o.debit_card.available)}
-          ${row("balance", S("Con mi saldo Félix", "With my Félix balance"), money(o.balance.balance || 0), o.balance.available)}
+          ${row("debit", S("Con mi tarjeta", "With my card"), o.debit_card.needs_card ? "Visa o Mastercard" : o.debit_card.card, true)}
+          ${row("apple", S("Con Apple Pay", "With Apple Pay"), S("Confirmas con Face ID", "Confirm with Face ID"), true)}
+          ${state.account.open ? row("balance", S("Con mi saldo Félix", "With my Félix balance"), money(o.balance.balance || 0), o.balance.available) : ""}
           ${row("snpl", S("Envía ahora, paga después", "Send now, pay later"), o.snpl.available ? S(`Hasta ${money(o.snpl.approved_amount_usd)} · hoy solo comisiones`, `Up to ${money(o.snpl.approved_amount_usd)} · fees only today`) : ({ identity_not_verified: S("Necesita tu cuenta verificada", "Needs a verified account"), needs_debit_card_for_fees: S("Necesita una tarjeta de débito", "Needs a debit card"), one_active_loan_at_a_time: S("Ya tienes un préstamo activo", "You already have an active loan"), over_approved_amount: S(`Solo hasta ${money(o.snpl.approved_amount_usd || 150)}`, `Only up to ${money(o.snpl.approved_amount_usd || 150)}`) }[o.snpl.reason] || ""), o.snpl.available)}
           <div class="note">${S("Para", "To")} ${esc(r ? r.name : "")}</div></div>`;
       }
@@ -786,7 +805,7 @@
         return `<div class="${cls}">${head(S("Revisa y confirma", "Review and confirm"), S("Llega en minutos", "Arrives in minutes"), "cyan")}${whoHTML(r)}
           <div class="receive"><div class="lbl">${S("Recibe", "They get")}</div><div class="amt">${C.local(d.receive, r.country, prefs.lang)}</div></div>
           <div class="rows"><div class="row"><span>${S("Envías", "You send")}</span><b>${money(d.amount)}</b></div><div class="row"><span>${S("Comisión de envío", "Transfer fee")}</span><b>${money(d.fee)}</b></div>
-          <div class="row"><span>${S("Tipo de cambio", "Rate")}</span><b>1 USD = ${rt.rate} ${rt.cur}</b></div><div class="row"><span>${S("Pagas con", "Paid with")}</span><b>${d.via === "balance" ? S("Saldo Félix", "Félix balance") : "Visa ••4242"}</b></div>
+          <div class="row"><span>${S("Tipo de cambio", "Rate")}</span><b>1 USD = ${rt.rate} ${rt.cur}</b></div><div class="row"><span>${S("Pagas con", "Paid with")}</span><b>${d.via === "balance" ? S("Saldo Félix", "Félix balance") : d.via === "apple_pay" ? "Apple Pay" : state.debitCard ? state.debitCard.brand + " ••" + state.debitCard.last4 : S("Tarjeta", "Card")}</b></div>
           <div class="row total"><span>${S("Total a pagar", "Total")}</span><b>${money(d.total)}</b></div></div>${acts(c, S("Enviar", "Send"))}</div>`;
       }
       case "snpl_intro": {
@@ -802,7 +821,7 @@
           <div class="sched">${p.dates.map((dt) => `<div><b>${money(p.each)}</b><span>${C.dateLabel(new Date(dt), prefs.lang)}</span></div>`).join("")}</div>
           <div class="rows"><div class="row"><span>${S("Comisión del préstamo", "Loan fee")}</span><b>${money(p.loanFee)}</b></div><div class="row"><span>${S("Comisión del envío", "Transfer fee")}</span><b>${money(C.CONFIG.fee)}</b></div>
           <div class="row"><span>${S("Pagas hoy", "You pay today")}</span><b>${money(p.payToday)}</b></div><div class="row total"><span>${S("Total que pagas", "Total you pay")}</span><b>${money(p.total)}</b></div></div>
-          <div class="note">${S("Préstamo otorgado por Lead Bank. Valores de prueba.", "Loan issued by Lead Bank. Test values.")}</div></div>`;
+          <div class="note">${S("Préstamo otorgado por Lead Bank.", "Loan issued by Lead Bank.")}</div></div>`;
       }
       case "snpl_review": {
         const r = recOf(d.rid), rt = C.CONFIG.rates[r.country], p = state.snpl.plan;
@@ -926,8 +945,7 @@
         <div class="h-dbody">${WAVE}
           <div class="h-ballbl">${S("Saldo total", "Total balance")} <i>${HIc("eye", 15)}</i></div>
           <div class="h-balrow"><div class="h-bal" data-bal><span class="b1">$<span data-int>${p.int}</span></span><span class="b2">.</span><span class="b3" data-dec>${p.dec}</span><span class="b4" data-micro>${p.micro.split("").map((d) => `<span>${d}</span>`).join("")}</span></div>${a.open ? `<button class="h-balgo" data-hview="earn" aria-label="${S("Ganancias", "Earnings")}">${HIc("chev", 22)}</button>` : ""}</div>
-          ${a.open ? `<button class="h-earn" data-hview="earn">${S("Ganando <b>4%</b> anual", "Earning <b>4%</b> APY")} · +<span data-earned>$${Home.earned.toFixed(7)}</span> ${S("hoy", "today")} ${HIc("up", 13, 2)}</button>`
-            : `<button class="h-open" data-hsay="${esc(S("Quiero abrir mi cuenta", "I want to open my account"))}">${S("Abre tu cuenta", "Open your account")}</button>`}
+          ${a.open ? `<button class="h-earn" data-hview="earn">${S("Ganando <b>4%</b> anual", "Earning <b>4%</b> APY")} · +<span data-earned>$${Home.earned.toFixed(7)}</span> ${S("hoy", "today")} ${HIc("up", 13, 2)}</button>` : ""}
         </div>
       </div>
       <div class="h-sec">${S("Pídele a Félix", "Ask Félix")}</div>
@@ -972,7 +990,7 @@
     if (!tx) return head + `<div class="h-rcpt"><div class="amt">${m.amount < 0 ? "−" : "+"}${money(Math.abs(m.amount))}</div><div class="h-rrow"><span>${S("Concepto", "Description")}</span><b>${esc(tr(m.title))}</b></div><div class="h-rrow"><span>${S("Fecha", "Date")}</span><b>${esc(tr(m.date))} · ${mvTime(m)}</b></div></div>`;
     const r = recOf(tx.rid) || { name: "", country: "MX", method: "" }, c = C.CONFIG.rates[r.country] || C.CONFIG.rates.MX;
     const stepTxt = [S("Enviado", "Sent"), S("En camino", "On the way"), S("Entregado", "Delivered")][tx.step || 0];
-    const via = tx.via === "snpl" ? S("Envía ahora, paga después", "Send now, pay later") : tx.via === "paylater" ? S("Paga después", "Pay later") : S("Saldo o débito", "Balance or debit");
+    const via = tx.via === "snpl" ? S("Envía ahora, paga después", "Send now, pay later") : tx.via === "paylater" ? S("Paga después", "Pay later") : tx.pay === "apple_pay" ? "Apple Pay" : tx.pay === "balance" ? S("Saldo Félix", "Félix balance") : state.debitCard ? state.debitCard.brand + " ••" + state.debitCard.last4 : S("Tarjeta", "Card");
     const rows = [[S("Para", "To"), r.name], [S("Envías", "You send"), money(tx.amount)], [S("Recibe", "They get"), `${c.sym}${Number(tx.receive).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${c.cur}`], [S("Tipo de cambio", "Rate"), `1 USD = ${c.rate} ${c.cur}`], [S("Comisión", "Fee"), money(C.CONFIG.fee)], [S("Método", "Method"), tr(r.method)], [S("Pagado con", "Paid with"), via], [S("Folio", "Reference"), tx.ref], [S("Fecha", "Date"), `${tr(m.date)} · ${mvTime(m)}`]];
     return head + `<div class="h-rcpt"><span class="h-st s${tx.step || 0}">${HIc(tx.step === 2 ? "check" : "send", 14, 2.2)} ${stepTxt}</span><div class="amt">${money(tx.amount)}</div>${rows.map(([l, v]) => `<div class="h-rrow"><span>${l}</span><b>${esc(v || "")}</b></div>`).join("")}</div>
       <button class="h-share" data-hshare="${Home.sel}">${HIc("share", 18)} ${S("Compartir recibo", "Share receipt")}</button>`;
