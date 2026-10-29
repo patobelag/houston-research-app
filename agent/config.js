@@ -27,28 +27,33 @@ Cuando ofrezcas opciones, no pongas siempre las remesas primero. Varía: cuenta,
 {{user_context}}
 
 # Usuario nuevo (contexto "Escenario: usuario nuevo"): flujos reales de Félix
-Pide los datos con naturalidad, como en la app real. Nunca menciones pruebas, prototipos ni datos inventados. Nunca pidas SSN, contraseñas ni el número de la tarjeta.
-No empujes la Cuenta Félix. Para mandar dinero NO hace falta cuenta. Ofrece la cuenta solo si la persona la pide, o si elige algo que la necesita (préstamo a su cuenta, Envía ahora paga después, cargar dinero o pagar con saldo). No la ofrezcas después de cada envío.
-1. Nombre: si no sabes su nombre, pregúntalo y llama set_user_name. Luego "Mucho gusto, [nombre]. ¿Con qué te ayudo hoy?".
-2. Remesa a alguien nuevo (sin cuenta):
-   a. Monto y país. Si quiere saber cuánto llega, show_quote.
-   b. Destinatario: nombre completo como aparece en su identificación y ciudad. NO preguntes el parentesco.
-   c. Cómo lo recibe: depósito a cuenta (banco + CLABE de 18 dígitos en México, o número de cuenta) o efectivo (México: Elektra, Coppel u OXXO). Si la CLABE no tiene 18 dígitos, pídela otra vez una sola vez. Si no la tiene a la mano, usa use_test_account sin comentarlo. En efectivo, avisa que debe llevar su identificación. Llama add_recipient con todo.
-   d. Forma de pago: llama payment_options y ofrece: tarjeta Visa o Mastercard, o Apple Pay. Si ya tiene cuenta, también saldo Félix o "Envía ahora, paga después".
-      - Tarjeta: pregunta "¿Visa o Mastercard?", llama add_debit_card con la marca y dile que la tarjeta quedó lista. No pidas números.
-      - Apple Pay: review_transfer con pay_with apple_pay. Al confirmar se aprueba con Face ID.
-   e. review_transfer con su forma de pago, lee lo esencial y pregunta. Con su sí: confirm_pending.
-3. Abrir Cuenta Félix (solo si la pide o la necesita), en este orden:
-   a. Explica en una frase y pide aceptar los términos (comunicaciones digitales, términos de la cuenta y de rendimiento). Con su sí: accept_terms.
+Pide los datos con naturalidad, como en la app real. Nunca menciones pruebas, prototipos ni datos inventados. Nunca pidas SSN, ITIN, estatus migratorio, contraseñas ni el número de la tarjeta en voz.
+La tarjeta de Félix es virtual. Nunca hables de tarjeta física ni de envíos por correo.
+Qué ofrecer y en qué orden (paso a paso):
+- Desde hoy, sin requisitos previos: abrir la Cuenta Félix gratis (tarjeta Visa virtual y 4% anual) o mandar dinero a su familia sin abrir cuenta.
+- Solo con cuenta abierta y tarjeta: Envía ahora, paga después, y préstamo a su cuenta. Si lo pide sin cuenta, explícale que primero abre su cuenta y pregúntale si empiezan.
+- No empujes la cuenta durante un envío ni después de cada envío.
+1. Nombre: si no sabes su nombre, pregúntalo y llama set_user_name. Luego "Mucho gusto, [nombre]. ¿Abrimos tu cuenta o mandamos dinero?".
+2. Abrir Cuenta Félix (lo mínimo y lo menos riesgoso para la persona), en este orden:
+   a. Explica en una frase y pide aceptar los términos en un solo sí. Con su sí: accept_terms.
    b. Nombre completo y fecha de nacimiento: save_identity.
-   c. "¿Qué identificación tienes?" Aceptadas: licencia de EE.UU., INE o DNI con foto, pasaporte o passport card, permiso de residencia o trabajo, matrícula consular. Llama start_id_check y dile que toque la pantalla para escanear su ID y tomarse una selfie. Espera a que diga que terminó.
-   d. open_account. Si falta algo, pídelo.
-4. Envía ahora, paga después (SNPL): es un método de pago. Félix le presta el dinero del envío; hoy solo paga las comisiones con su tarjeta (comisión del préstamo diez dólares + comisión del envío) y después 4 cuotas. Requiere cuenta verificada, tarjeta y monto hasta el aprobado (ciento cincuenta dólares). Si no tiene cuenta, explícalo y pregunta si quiere abrirla o pagar con tarjeta o Apple Pay. Pasos:
+   c. "¿Qué identificación tienes a la mano?" Sirven: matrícula consular, pasaporte, INE o identificación con foto de su país, o licencia de EE.UU. Llama start_id_check y dile que toque la pantalla para escanear su identificación y tomarse una selfie. Espera a que diga que terminó.
+   d. open_account. Dile que su tarjeta Visa virtual ya está lista.
+3. Mandar dinero (con o sin cuenta). Pide los datos básicos, uno a la vez:
+   a. Cuánto y a qué país. Si quiere saber cuánto llega, show_quote.
+   b. Quién: nombre completo como aparece en su identificación. NO preguntes el parentesco.
+   c. A dónde: ciudad.
+   d. Cómo lo recibe: depósito a cuenta (banco y CLABE de 18 dígitos en México, o número de cuenta) o efectivo (México: Elektra, Coppel u OXXO). Sin número de cuenta no se puede depositar: si no lo tiene, ofrece efectivo. En efectivo, avisa que debe llevar su identificación. Llama add_recipient con todo.
+   e. Forma de pago: llama payment_options y ofrece tarjeta Visa o Mastercard, o Apple Pay. Si tiene cuenta, también saldo Félix o Envía ahora, paga después.
+      - Tarjeta: pregunta "¿Visa o Mastercard?" y llama add_debit_card. Dile que la agregue en pantalla. Espera a que diga que terminó. Sin tarjeta no se puede seguir.
+      - Apple Pay: review_transfer con pay_with apple_pay y dile que toque "Pagar con Apple Pay" en pantalla. Cuando diga que confirmó, llama confirm_pending.
+   f. Con tarjeta o saldo: review_transfer, lee lo esencial y pregunta. Con su sí: confirm_pending.
+4. Envía ahora, paga después (SNPL): es un método de pago. Félix le presta el dinero del envío; hoy solo paga las comisiones con su tarjeta (comisión del préstamo diez dólares + comisión del envío) y después 4 cuotas. Requiere cuenta abierta, tarjeta agregada y monto hasta el aprobado (ciento cincuenta dólares). Pasos:
    a. snpl_start.
    b. Pide su dirección en EE.UU. (no P.O. Box) y su consentimiento para firmar electrónicamente. snpl_submit_application. Di "¡Estás aprobado!" y lee los términos: cuotas, comisión del préstamo, pagas hoy y total.
    c. Pregunta si acepta los términos y si quiere pago automático o no (no recomiendes ninguno). snpl_accept_terms con accepted y autopay.
    d. Lee el resumen y pregunta "¿Enviamos el dinero con tu préstamo?". Con su sí: confirm_pending.
-5. Préstamo a su Cuenta Félix: offer_cash_loan. 8 pagos semanales, APR de 8 por ciento, activación de un dólar con su tarjeta, el dinero llega a su Cuenta Félix. Primer préstamo hasta doscientos cincuenta dólares. Necesita cuenta. Con su sí: confirm_pending.
+5. Préstamo a su Cuenta Félix: requiere cuenta abierta y tarjeta. offer_cash_loan. 8 pagos semanales, APR de 8 por ciento, activación de un dólar con su tarjeta, el dinero llega a su Cuenta Félix. Primer préstamo hasta doscientos cincuenta dólares. Con su sí: confirm_pending.
 Ve paso a paso, una pregunta a la vez. Si un paso falta, la herramienta te dice qué falta.
 
 # Usuario actual (contexto "Escenario: usuario actual"): usa prepare_transfer, offer_pay_later y offer_loan como antes.
@@ -85,9 +90,9 @@ const obj = (properties, required = []) => ({ type: "object", properties, requir
 const TOOLS = [
   { name: "accept_terms", description: "Registra que el usuario aceptó los términos de la Cuenta Félix (E-SIGN, cuenta y rendimiento). Solo tras su sí." },
   { name: "save_identity", description: "Guarda nombre completo y fecha de nacimiento.", parameters: obj({ full_name: str("Nombre completo"), birth_date: str("Fecha de nacimiento, como la dijo") }) },
-  { name: "start_id_check", description: "Inicia la verificación de identidad: muestra la pantalla para escanear el ID y tomar selfie.", parameters: obj({ id_type: str("Tipo de identificación: licencia, INE, DNI, pasaporte, permiso de residencia, matrícula consular") }, ["id_type"]) },
+  { name: "start_id_check", description: "Inicia la verificación de identidad: muestra la pantalla para escanear el ID y tomar selfie.", parameters: obj({ id_type: str("Tipo de identificación: matrícula consular, pasaporte, INE o ID de su país, licencia de EE.UU.") }, ["id_type"]) },
   { name: "open_account", description: "Abre la Cuenta Félix si ya aceptó términos, dio nombre y fecha, y verificó su ID. Si falta algo, dice qué." },
-  { name: "add_debit_card", description: "Agrega la tarjeta Visa o Mastercard de la persona para pagar envíos y comisiones. No pidas el número.", parameters: obj({ brand: str("Visa o Mastercard", { enum: ["Visa", "Mastercard"] }) }, ["brand"]) },
+  { name: "add_debit_card", description: "Muestra en pantalla la captura de la tarjeta Visa o Mastercard. La persona la agrega en pantalla; espera a que diga que terminó. No pidas el número.", parameters: obj({ brand: str("Visa o Mastercard", { enum: ["Visa", "Mastercard"] }) }, ["brand"]) },
   { name: "payment_options", description: "Muestra las formas de pago de un envío: tarjeta Visa o Mastercard, Apple Pay y, con cuenta, saldo Félix o Envía ahora, paga después.", parameters: obj({ recipient: str("Destinatario"), amount_usd: num("Monto en dólares") }, ["recipient", "amount_usd"]) },
   { name: "review_transfer", description: "Prepara el resumen 'Revisa y confirma' de un envío pagado con tarjeta, Apple Pay o saldo. No envía hasta confirm_pending.", parameters: obj({ recipient: str("Destinatario"), amount_usd: num("Monto en dólares"), amount_local: num("Monto en moneda local"), pay_with: str("debit_card, apple_pay o balance", { enum: ["debit_card", "apple_pay", "balance"] }) }, ["recipient", "pay_with"]) },
   { name: "snpl_start", description: "Inicia 'Envía ahora, paga después' como método de pago para un envío.", parameters: obj({ recipient: str("Destinatario"), amount_usd: num("Monto en dólares") }, ["recipient", "amount_usd"]) },
@@ -95,19 +100,18 @@ const TOOLS = [
   { name: "snpl_accept_terms", description: "Registra la aceptación de los términos del préstamo y la elección de pago automático. Prepara el resumen final.", parameters: obj({ accepted: { type: "boolean", description: "true si aceptó los términos" }, autopay: { type: "boolean", description: "true con pago automático, false sin pago automático" } }, ["accepted"]) },
   { name: "offer_cash_loan", description: "Ofrece un préstamo a la Cuenta Félix: 8 pagos semanales, APR 8%, activación $1. No deposita hasta confirm_pending.", parameters: obj({ amount_usd: num("Monto del préstamo en dólares") }) },
   { name: "set_user_name", description: "Guarda el nombre del usuario cuando te lo dice.", parameters: obj({ name: str("Nombre del usuario, como lo dijo") }, ["name"]) },
-  { name: "prepare_open_account", description: "Prepara la apertura de la cuenta Félix gratis con tarjeta de débito Visa. No abre nada hasta confirm_pending." },
+  { name: "prepare_open_account", description: "Prepara la apertura de la cuenta Félix gratis con tarjeta de débito Visa virtual. No abre nada hasta confirm_pending." },
   {
     name: "add_recipient",
     description: "Guarda a la persona que recibe el dinero, con lo que dijo el usuario. Si falta un dato, responde cuál falta.",
     parameters: obj({
       full_name: str("Nombre completo como aparece en su identificación"),
       country: str("País: México, Guatemala, Honduras o Colombia"),
-      city: str("Ciudad, si la dijo"),
+      city: str("Ciudad donde vive quien recibe"),
       method: str("bank (depósito a cuenta) o cash (efectivo)", { enum: ["bank", "cash"] }),
       bank: str("Banco, si es depósito"),
       account_number: str("CLABE o número de cuenta, si lo dio"),
-      use_test_account: { type: "boolean", description: "true si la persona no tiene el número de cuenta a la mano" },
-      cash_network: str("Red de efectivo: Elektra, Coppel, OXXO…"),
+            cash_network: str("Red de efectivo: Elektra, Coppel, OXXO…"),
     }, ["full_name"]),
   },
   {
