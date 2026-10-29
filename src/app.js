@@ -115,7 +115,11 @@
     update(id, patch) { if (cards[id]) Object.assign(cards[id], patch); render(); },
     later(ms, fn) { timers.push(setTimeout(fn, ms)); },
     notify(txt) {
-      if (EL.active()) { msgs.push({ role: "felix", text: txt[prefs.lang] }); render(); EL.context(txt.en); return; }
+      if (EL.active()) {
+        // En FC no tapamos lo último que dijo Félix: el aviso sale como notificación
+        if (FC) toast(txt[prefs.lang]); else { msgs.push({ role: "felix", text: txt[prefs.lang] }); render(); }
+        EL.context(txt.en); return;
+      }
       felixSays(txt[prefs.lang], { interruptible: true, auto: true });
     },
   };

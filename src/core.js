@@ -9,7 +9,7 @@
   const CONFIG = {
     fee: 2.99, // comisión por envío, USD
     rates: {
-      MX: { cur: "MXN", rate: 18.78, sym: "$", unit: { es: "pesos", en: "pesos" }, name: { es: "México", en: "Mexico" }, flag: "🇲🇽" },
+      MX: { cur: "MXN", rate: 18.78, sym: "$", unit: { es: "pesos mexicanos", en: "Mexican pesos" }, name: { es: "México", en: "Mexico" }, flag: "🇲🇽" },
       CO: { cur: "COP", rate: 3172, sym: "$", unit: { es: "pesos colombianos", en: "Colombian pesos" }, name: { es: "Colombia", en: "Colombia" }, flag: "🇨🇴" },
       GT: { cur: "GTQ", rate: 7.64, sym: "Q", unit: { es: "quetzales", en: "quetzales" }, name: { es: "Guatemala", en: "Guatemala" }, flag: "🇬🇹" },
       HN: { cur: "HNL", rate: 26.87, sym: "L", unit: { es: "lempiras", en: "lempiras" }, name: { es: "Honduras", en: "Honduras" }, flag: "🇭🇳" },
