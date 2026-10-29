@@ -329,10 +329,10 @@
       },
       start_id_check({ id_type } = {}) {
         state.kyc = state.kyc || {};
-        const ok = ["licencia", "license", "ine", "dni", "pasaporte", "passport", "matricula", "matrícula", "residencia", "permiso", "id"];
+        const ok = ["licencia", "license", "ine", "dni", "pasaporte", "passport", "matricula", "matrícula", "identificacion", "identificación", "credencial de elector", "cedula", "cédula", "id"];
         const t = String(id_type || "").toLowerCase();
-        if (!t) return { status: "need_id_type", accepted: ["Licencia de EE.UU.", "INE o DNI con foto", "Pasaporte o passport card", "Permiso de residencia o trabajo", "Matrícula consular"] };
-        if (!ok.some((k) => t.includes(k))) return { status: "not_accepted", accepted: ["Licencia de EE.UU.", "INE o DNI con foto", "Pasaporte o passport card", "Permiso de residencia o trabajo", "Matrícula consular"] };
+        if (!t) return { status: "need_id_type", accepted: ["Matrícula consular", "Pasaporte", "INE o identificación con foto de tu país", "Licencia de EE.UU."] };
+        if (!ok.some((k) => t.includes(k))) return { status: "not_accepted", accepted: ["Matrícula consular", "Pasaporte", "INE o identificación con foto de tu país", "Licencia de EE.UU."] };
         state.kyc.idType = id_type;
         hooks.card("id_scan", { idType: id_type });
         return { status: "waiting_for_scan", next: "The user taps the screen to scan the ID and take a selfie. Wait for them to tell you it's done." };
@@ -346,14 +346,16 @@
         state.account.card = { last4: "3307", frozen: false, virtual: true };
         state.flags.opened = true;
         hooks.card("account_opened", {});
-        return { status: "opened", card_last4: "3307", card: "virtual Visa debit, physical one arrives by mail", balance: 0 };
+        return { status: "opened", card_last4: "3307", card: "virtual Visa debit card, ready to use online and in Apple Pay", balance: 0 };
       },
       // ── Tarjeta de débito para pagar (simulada) ──
+      // La persona agrega su tarjeta en pantalla (número, vencimiento y CVC). Félix nunca la pide en voz.
       add_debit_card({ brand } = {}) {
+        if (state.debitCard) return { status: "ok", card: `${state.debitCard.brand} ••${state.debitCard.last4}` };
         const mc = /master/i.test(brand || "");
-        state.debitCard = { brand: mc ? "Mastercard" : "Visa", last4: mc ? "5454" : "4242" };
-        hooks.card("debit_added", {});
-        return { status: "ok", card: `${state.debitCard.brand} ••${state.debitCard.last4}` };
+        state.cardDraft = { brand: mc ? "Mastercard" : "Visa", last4: mc ? "5454" : "4242", step: 0 };
+        hooks.card("card_entry", {});
+        return { status: "waiting_for_card_entry", brand: state.cardDraft.brand, next: "Tell them to enter their card on the screen. Do not ask for the number. Wait until they say it's done." };
       },
       // ── Métodos de pago de una remesa: débito, saldo o Envía ahora, paga después ──
       payment_options({ recipient, amount_usd } = {}) {
@@ -460,13 +462,14 @@
         const c = findCity(norm(city || "")) || findCity(norm(country || ""));
         const cc = c ? c.country : (/guate/i.test(country || "") ? "GT" : /hond/i.test(country || "") ? "HN" : /colom/i.test(country || "") ? "CO" : /m[eé]x/i.test(country || "") ? "MX" : null);
         if (!cc) return { status: "need_country", options: ["México", "Guatemala", "Honduras", "Colombia"] };
+        if (!String(city || "").trim()) return { status: "need_city", note: "Pregunta en qué ciudad vive" };
         if (!method) return { status: "need_method", options: ["bank (depósito a cuenta)", "cash (retiro en efectivo)"], cash_networks: CONFIG.cashNetworks[cc] };
         const m = /cash|efectivo|tienda|oxxo|elektra|coppel|retiro/i.test(method) ? "cash" : "bank";
         let acct = account_number ? String(account_number).replace(/\D/g, "") : "";
         if (m === "bank" && !acct && use_test_account) acct = CONFIG.testAccounts[cc];
         if (m === "bank" && !bank) return { status: "need_bank", note: cc === "MX" ? "Pide el banco y la CLABE de 18 dígitos" : "Pide el banco y el número de cuenta" };
-        if (m === "bank" && !acct) return { status: "need_account_number", format: cc === "MX" ? "CLABE de 18 dígitos" : "número de cuenta", tip: "Si es prueba, usa use_test_account=true" };
-        if (m === "bank" && cc === "MX" && acct.length !== 18) return { status: "invalid_clabe", tip: "La CLABE tiene 18 dígitos. Usa use_test_account=true para una de prueba." };
+        if (m === "bank" && !acct) return { status: "need_account_number", format: cc === "MX" ? "CLABE de 18 dígitos" : "número de cuenta", tip: "Pide el número completo" };
+        if (m === "bank" && cc === "MX" && acct.length !== 18) return { status: "invalid_clabe", tip: "La CLABE tiene 18 dígitos. Pídela otra vez." };
         const net = m === "cash" ? (CONFIG.cashNetworks[cc] || []).find((n) => norm(cash_network || "").includes(norm(n))) || (CONFIG.cashNetworks[cc] || ["red de pago"])[0] : null;
         const id = norm(nm).replace(/\s/g, "") || "familiar";
         const first = /^(don|doña|tía|tío|sra|sr)\b/i.test(nm) ? nm.split(" ").slice(0, 2).join(" ") : nm.split(" ")[0];

@@ -93,8 +93,8 @@
   function introFC() {
     const n = state.user.name;
     return S(
-      `Hola${n ? " " + n : ""}, soy Félix, tu compañero para tu dinero. Conmigo mandas dinero a tu familia, pides un crédito, pagas servicios, recargas celulares y, si quieres, abres tu cuenta con tarjeta de débito. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ${n ? "¿Con qué te ayudo hoy?" : "Para empezar, ¿cómo te llamas?"}`,
-      `Hi${n ? " " + n : ""}, I'm Félix, your money companion. With me you send money to your family, get a loan, pay bills, top up phones and, if you want, open your account with a debit card. To talk to me, tap the button and speak; when you're done, tap it again. ${n ? "What can I help you with today?" : "To start, what's your name?"}`);
+      `Hola${n ? " " + n : ""}, soy Félix, tu compañero para tu dinero. Hoy mismo puedes abrir tu Cuenta Félix gratis, con tarjeta Visa virtual y 4% anual, o mandar dinero a tu familia sin abrir cuenta. Con tu cuenta abierta también tienes Envía ahora, paga después y préstamos. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ${n ? "¿Por dónde empezamos?" : "Para empezar, ¿cómo te llamas?"}`,
+      `Hi${n ? " " + n : ""}, I'm Félix, your money companion. Today you can open your free Félix account, with a virtual Visa card and 4% APY, or send money to your family without an account. With your account open you also get Send now, pay later and loans. To talk to me, tap the button and speak; when you're done, tap it again. ${n ? "Where shall we start?" : "To start, what's your name?"}`);
   }
 
   // ───────── Sesión ─────────
@@ -518,12 +518,12 @@
     $("#kb").classList.toggle("on", prefs.kb);
     $("#kb-input").placeholder = t("typeHere");
     $("#kb-send").innerHTML = I("send", 20, 2.2);
-    if (FC) { $("#btn-mute").dataset.lbl = prefs.muted ? S("Activar voz", "Unmute") : S("Silenciar", "Mute"); renderHome(); }
+    if (FC) { renderTop(); $("#btn-mute").dataset.lbl = prefs.muted ? S("Activar voz", "Unmute") : S("Silenciar", "Mute"); renderHome(); }
   }
 
   function renderTop() {
     if (FC) {
-      $("#top").innerHTML = `<img class="logo-img fc-logo" src="/assets/felix-logotype.svg" alt="Félix">`;
+      $("#top").innerHTML = `<span class="fc-ic-pad"></span><img class="logo-img fc-logo" src="/assets/felix-logotype.svg" alt="Félix"><button class="fc-ic fc-mute ${prefs.muted ? "off" : ""}" id="fc-mute" title="${prefs.muted ? S("Activar voz", "Unmute") : S("Silenciar a Félix", "Mute Félix")}" aria-label="${prefs.muted ? S("Activar voz", "Unmute") : S("Silenciar a Félix", "Mute Félix")}">${I(prefs.muted ? "spkOff" : "spk", 20, 1.8)}</button>`;
       return;
     }
     const a = state.account;
@@ -568,7 +568,7 @@
     const card = turnCards.length ? cards[turnCards[turnCards.length - 1].id] : null;
     const you = lastU > lastF ? msgs[lastU].text : "";
     $("#screen").classList.toggle("has-card", !!card);
-    const key = [lastF, lastU, card ? card.id + (card.resolved || "") + JSON.stringify(state.transfers) + JSON.stringify(state.kyc || {}) + JSON.stringify(state.snpl || {}) : "", status === "listening"].join("|");
+    const key = [lastF, lastU, card ? card.id + (card.resolved || "") + JSON.stringify(state.transfers) + JSON.stringify(state.kyc || {}) + JSON.stringify(state.snpl || {}) + JSON.stringify(state.cardDraft || {}) + !!state.debitCard + state.applePay : "", status === "listening"].join("|");
     if (el.dataset.k === key) return;
     el.dataset.k = key;
     el.innerHTML = `<div class="spacer-top"></div>
@@ -601,7 +601,7 @@
     if (FC && state.snpl && state.snpl.termsOk && state.snpl.autopay === null && !state.pending) return [[S("Con pago automático", "With autopay")], [S("Sin pago automático", "Without autopay")]];
     if (FC) return state.account.open
       ? [[S("Mandar dinero", "Send money")], [S("Envía ahora, paga después", "Send now, pay later")], [S("Pedir un préstamo", "Get a loan")], [S("Cargar dinero", "Add money")]]
-      : [[S("Mandar dinero", "Send money")], [S("¿A cómo está el dólar?", "What's the exchange rate?")], [S("Pedir un préstamo", "Get a loan")], [S("Abrir mi cuenta", "Open my account")]];
+      : [[S("Abrir mi cuenta", "Open my account")], [S("Mandar dinero", "Send money")], [S("¿Cómo funciona la cuenta?", "How does the account work?")]];
     return [[S("¿Cuánto le llega a mi mamá si mando 200?", "How much does Mom get if I send $200?")], [S("Mándale $100 a mi mamá", "Send Mom $100")], [S("Quiero cargar dinero", "I want to add money")], [S("Envía hoy y paga después", "Send now, pay later")]];
   }
   function renderChips() {
@@ -612,7 +612,7 @@
       // Solo las acciones del momento (máx. 2). Antes de la primera interacción, 2 ideas para empezar.
       let list = chipList();
       list = list.filter(([t]) => t !== "x");
-      const isDefault = !state.pending && list.length === 4;
+      const isDefault = !state.pending && list.length >= 3 && list[0][0] !== t("sayConfirm");
       if (!state.user.name) list = [];
       else if (isDefault && msgs.slice(namedAt + 1).some((m) => m.role === "user")) list = [];
       el.innerHTML = list.slice(0, isDefault ? 4 : 2).map(([txt, pri]) => `<button class="chip-b ${pri ? "pri" : ""}" data-say="${esc(txt)}">${esc(txt)}</button>`).join("");
@@ -624,10 +624,10 @@
   function renderSides() {
     const groups = FC ? [
       [S("1 · Presentarse", "1 · Introduce yourself"), [S("Me llamo Ana", "My name is Ana")]],
-      [S("2 · Enviar a alguien nuevo (sin cuenta)", "2 · Send to someone new (no account)"), [S("Quiero mandar 100 dólares a México", "I want to send $100 to Mexico"), S("Se llama Lupe Martínez y vive en Puebla", "Her name is Lupe Martinez, she lives in Puebla"), S("A su cuenta de BBVA, la CLABE es 002180700123456789", "To her BBVA account, CLABE 002180700123456789"), S("Que lo cobre en efectivo en Elektra", "Cash pickup at Elektra")]],
-      [S("3 · Pagar el envío", "3 · Pay for the transfer"), [S("Con mi tarjeta Visa", "With my Visa card"), S("Con Mastercard", "With Mastercard"), S("Con Apple Pay", "With Apple Pay"), S("Sí, envíalo", "Yes, send it")]],
-      [S("4 · Abrir cuenta (si la pide)", "4 · Open account (if asked)"), [S("Quiero abrir mi cuenta", "I want to open my account"), S("Sí, acepto", "Yes, I accept"), S("Me llamo Ana Prueba López y nací el 3 de mayo de 1990", "My name is Ana Test Lopez, born May 3, 1990"), S("Tengo matrícula consular", "I have a consular ID")]],
-      [S("5 · Envía ahora, paga después y préstamo (con cuenta)", "5 · Send now, pay later and loan (with account)"), [S("Envía ahora, paga después", "Send now, pay later"), S("Mi dirección es 123 Main Street, Houston", "My address is 123 Main Street, Houston"), S("Sí, acepto firmar", "Yes, I agree to sign"), S("Sin pago automático", "Without autopay"), S("Quiero un préstamo de 150 dólares", "I want a $150 loan")]],
+      [S("2 · Abrir cuenta", "2 · Open account"), [S("Quiero abrir mi cuenta", "I want to open my account"), S("Sí, acepto", "Yes, I accept"), S("Me llamo Ana Prueba López y nací el 3 de mayo de 1990", "My name is Ana Test Lopez, born May 3, 1990"), S("Tengo matrícula consular", "I have a consular ID")]],
+      [S("3 · Enviar dinero (con o sin cuenta)", "3 · Send money (with or without account)"), [S("Quiero mandar 100 dólares a México", "I want to send $100 to Mexico"), S("Se llama Lupe Martínez y vive en Puebla", "Her name is Lupe Martinez, she lives in Puebla"), S("A su cuenta de BBVA, la CLABE es 002180700123456789", "To her BBVA account, CLABE 002180700123456789"), S("Que lo cobre en efectivo en Elektra", "Cash pickup at Elektra")]],
+      [S("4 · Pagar el envío", "4 · Pay for the transfer"), [S("Con mi tarjeta Visa", "With my Visa card"), S("Con Apple Pay", "With Apple Pay"), S("Sí, envíalo", "Yes, send it")]],
+      [S("5 · Con cuenta: Envía ahora, paga después y préstamo", "5 · With account: Send now, pay later and loan"), [S("Envía ahora, paga después", "Send now, pay later"), S("Mi dirección es 123 Main Street, Houston", "My address is 123 Main Street, Houston"), S("Sí, acepto firmar", "Yes, I agree to sign"), S("Sin pago automático", "Without autopay"), S("Quiero un préstamo de 150 dólares", "I want a $150 loan")]],
     ] : [
       [S("1 · Remesa con calculadora", "1 · Remittance + calculator"), [S("¿Cuánto le llega a mi mamá si mando 200?", "How much does my mom get if I send $200?"), S("¿Y si mando 300?", "And if I send $300?"), S("Mándale 100 dólares a mi mamá", "Send my mom $100")]],
       [S("2 · Cargar dinero", "2 · Add money"), [S("Quiero cargar 200 dólares a mi cuenta", "I want to add $200 to my account")]],
@@ -788,6 +788,18 @@
           <div class="idframe ${st === 2 ? "scanning" : ""} ${st >= 1 ? "got" : ""}"><span>${st >= 1 ? S("ID capturada", "ID captured") : S("Coloca tu ID dentro del marco", "Place your ID in the frame")}</span></div>
           <div class="note">${S("Simulado: no se guarda ninguna foto.", "Simulated: no photo is stored.")}</div>${btn}</div>`;
       }
+      case "card_entry": {
+        const dr = state.cardDraft || { brand: "Visa", last4: "4242", step: 0 }, saved = !!state.debitCard;
+        const fill = dr.step >= 2 || saved;
+        const num = fill ? (dr.brand === "Mastercard" ? "5454 5454 5454 " : "4242 4242 4242 ") + dr.last4 : "";
+        const f = (l, v, ph) => `<div class="ce-f ${v ? "on" : ""}"><small>${l}</small><b>${v || ph}</b></div>`;
+        const btn = saved ? `<div class="done-note">${I("check", 16, 2.6)} ${S("Tarjeta guardada", "Card saved")}</div>`
+          : dr.step === 1 ? `<div class="scan-run">${S("Leyendo tu tarjeta…", "Reading your card…")}<span class="typing"><i></i><i></i><i></i></span></div>`
+          : dr.step >= 2 ? `<div class="acts scan-acts"><button class="btn pri" data-card="save">${S("Guardar tarjeta", "Save card")}</button></div>`
+          : `<div class="acts scan-acts"><button class="btn pri" data-card="scan">${S("Escanear mi tarjeta", "Scan my card")}</button></div>`;
+        return `<div class="${cls}">${head(S("Agrega tu tarjeta", "Add your card"), dr.brand, "cyan")}
+          <div class="ce">${f(S("Número de tarjeta", "Card number"), num, "•••• •••• •••• ••••")}<div class="ce-row">${f(S("Vence", "Expires"), fill ? "12/29" : "", "MM/AA")}${f("CVC", fill ? "•••" : "", "•••")}</div></div>${btn}</div>`;
+      }
       case "debit_added":
         return `<div class="${cls}">${head(S("Tarjeta agregada", "Card added"), S("Lista", "Ready"), "ok")}<div class="who"><div class="ini">${state.debitCard.brand === "Mastercard" ? "MC" : "VISA"}</div><div><div class="nm">${state.debitCard.brand} •••• ${state.debitCard.last4}</div><div class="ds">${S("Para pagar tus envíos", "To pay for your transfers")}</div></div></div></div>`;
       case "pay_methods": {
@@ -806,7 +818,7 @@
           <div class="receive"><div class="lbl">${S("Recibe", "They get")}</div><div class="amt">${C.local(d.receive, r.country, prefs.lang)}</div></div>
           <div class="rows"><div class="row"><span>${S("Envías", "You send")}</span><b>${money(d.amount)}</b></div><div class="row"><span>${S("Comisión de envío", "Transfer fee")}</span><b>${money(d.fee)}</b></div>
           <div class="row"><span>${S("Tipo de cambio", "Rate")}</span><b>1 USD = ${rt.rate} ${rt.cur}</b></div><div class="row"><span>${S("Pagas con", "Paid with")}</span><b>${d.via === "balance" ? S("Saldo Félix", "Félix balance") : d.via === "apple_pay" ? "Apple Pay" : state.debitCard ? state.debitCard.brand + " ••" + state.debitCard.last4 : S("Tarjeta", "Card")}</b></div>
-          <div class="row total"><span>${S("Total a pagar", "Total")}</span><b>${money(d.total)}</b></div></div>${acts(c, S("Enviar", "Send"))}</div>`;
+          <div class="row total"><span>${S("Total a pagar", "Total")}</span><b>${money(d.total)}</b></div></div>${d.via === "apple_pay" && !c.resolved ? (state.applePay === c.id ? `<div class="scan-run">${S("Face ID…", "Face ID…")}<span class="typing"><i></i><i></i><i></i></span></div>` : `<div class="acts scan-acts"><button class="btn apay" data-applepay="${c.id}">${S("Pagar con Apple Pay", "Pay with Apple Pay")} · ${money(d.total)}</button></div>`) : acts(c, S("Enviar", "Send"))}</div>`;
       }
       case "snpl_intro": {
         const r = recOf(d.rid);
@@ -939,13 +951,14 @@
     const ini = nm ? nm.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase() : "·";
     const sugg = homeSuggestions().map(([ic, txt, act, say]) => `<button class="h-sg" data-hsay="${esc(say)}"><i>${HIc(ic, 17)}</i><span>${esc(txt)}</span>${act ? `<b>${esc(act)}</b>` : ""}</button>`).join("");
     const mv = state.movements.map((m, i) => `<button class="h-tr" data-hmv="${i}"><span class="ic">${HIc(mvIcon(m), 19)}</span><span class="tx"><b>${esc(tr(m.title))}</b><span>${esc(tr(m.date))} · ${mvTime(m)}${state.transfers[m.id] ? " · " + S("Ver recibo", "See receipt") : ""}</span></span><span class="am ${m.amount > 0 ? "in" : ""}">${m.amount < 0 ? "−" : "+"}${money(Math.abs(m.amount))}</span></button>`).join("");
-    return `<div class="h-top">${nm ? `<span class="h-av">${esc(ini)}</span>` : ""}</div>
+    return `<div class="h-top">${nm ? `<span class="h-av">${esc(ini)}</span>` : "<span></span>"}<button class="h-mute ${prefs.muted ? "off" : ""}" id="fc-mute" aria-label="${prefs.muted ? S("Activar voz", "Unmute") : S("Silenciar a Félix", "Mute Félix")}">${I(prefs.muted ? "spkOff" : "spk", 19, 1.8)}</button></div>
       <div class="h-dash">
         ${card ? `<button class="h-dtop" data-hview="cards"><span>${S("Tus tarjetas", "Your cards")}</span>${HIc("chev", 18)}</button>` : `<div class="h-dtop"><span>${S("Cuenta Félix", "Félix account")}</span></div>`}
         <div class="h-dbody">${WAVE}
           <div class="h-ballbl">${S("Saldo total", "Total balance")} <i>${HIc("eye", 15)}</i></div>
           <div class="h-balrow"><div class="h-bal" data-bal><span class="b1">$<span data-int>${p.int}</span></span><span class="b2">.</span><span class="b3" data-dec>${p.dec}</span><span class="b4" data-micro>${p.micro.split("").map((d) => `<span>${d}</span>`).join("")}</span></div>${a.open ? `<button class="h-balgo" data-hview="earn" aria-label="${S("Ganancias", "Earnings")}">${HIc("chev", 22)}</button>` : ""}</div>
-          ${a.open ? `<button class="h-earn" data-hview="earn">${S("Ganando <b>4%</b> anual", "Earning <b>4%</b> APY")} · +<span data-earned>$${Home.earned.toFixed(7)}</span> ${S("hoy", "today")} ${HIc("up", 13, 2)}</button>` : ""}
+          ${a.open ? `<button class="h-earn" data-hview="earn">${S("Ganando <b>4%</b> anual", "Earning <b>4%</b> APY")} · +<span data-earned>$${Home.earned.toFixed(7)}</span> ${S("hoy", "today")} ${HIc("up", 13, 2)}</button>`
+            : `<button class="h-open" data-hsay="${esc(S("Quiero abrir mi cuenta", "I want to open my account"))}">${S("Abre tu cuenta", "Open your account")}</button>`}
         </div>
       </div>
       <div class="h-sec">${S("Pídele a Félix", "Ask Félix")}</div>
@@ -967,7 +980,7 @@
         <button class="h-row" data-hcard="wallet"><i>${HIc("wallet")}</i><span>${S("Agregar a Apple Wallet", "Add to Apple Wallet")}</span>${HIc("chev", 18)}</button>
         <button class="h-row" data-hsay="${esc(S("Tengo un problema con mi tarjeta", "I have a problem with my card"))}"><i>${HIc("chat")}</i><span>${S("Pedirle ayuda a Félix", "Ask Félix for help")}</span>${HIc("chev", 18)}</button>
       </div>
-      <p class="h-note">${S("Tu tarjeta física llega por correo. Mientras, usa la virtual.", "Your physical card arrives by mail. Use the virtual one meanwhile.")}</p>`;
+      <p class="h-note">${S("Tu tarjeta es virtual: úsala en compras en línea y en Apple Pay.", "Your card is virtual: use it online and in Apple Pay.")}</p>`;
   }
 
   function homeEarn() {
@@ -1059,6 +1072,15 @@
     if (say) { userSays(say.dataset.say, "tap"); return; }
     if (e.target.closest("#btn-cc")) { prefs.captions = !prefs.captions; render(); return; }
     if (e.target.closest("#fc-mute")) { $("#btn-mute").click(); return; }
+    const cb = e.target.closest("[data-card]");
+    if (cb && state.cardDraft) {
+      // Captura simulada de la tarjeta: escanear y guardar
+      if (cb.dataset.card === "scan") { state.cardDraft.step = 1; render(); setTimeout(() => { state.cardDraft.step = 2; render(); }, 1400); }
+      else { state.debitCard = { brand: state.cardDraft.brand, last4: state.cardDraft.last4 }; render(); userSays(S(`Listo, ya agregué mi tarjeta ${state.debitCard.brand}.`, `Done, I added my ${state.debitCard.brand} card.`), "tap"); }
+      return;
+    }
+    const ap = e.target.closest("[data-applepay]");
+    if (ap) { state.applePay = ap.dataset.applepay; render(); setTimeout(() => { state.applePay = null; userSays(S("Sí, confirmo con Apple Pay.", "Yes, I confirm with Apple Pay."), "tap"); }, 1300); return; }
     const sc = e.target.closest("[data-scan]");
     if (sc) {
       // Escaneo simulado de ID y selfie
@@ -1150,5 +1172,5 @@
   // Guion automático para pruebas: ?play=frase 1|frase 2
   const play = q.get("play") || window.__PLAY__;
   if (play) { prefs.muted = true; render(); play.split("|").forEach((p, i) => setTimeout(() => userSays(p, "kb"), 600 + i * 900)); }
-  window.FelixApp = { userSays, get state() { return state; }, get msgs() { return msgs; } };
+  window.FelixApp = { userSays, get state() { return state; }, get msgs() { return msgs; }, get tools() { return tools; } };
 })();

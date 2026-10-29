@@ -172,3 +172,20 @@
 .fc #btn-home, .fc #btn-mute, .fc #btn-kb { width: 48px; min-width: 48px; height: 48px; aspect-ratio: 1; padding: 0; }
 .fc .orb { width: 80px; height: 80px; aspect-ratio: 1; flex: 0 0 auto; }
 .fc .fc-pad { width: 48px; min-width: 48px; }
+
+/* Silenciar vive arriba a la derecha. Abajo: Inicio · Hablar · Escribir */
+.fc #btn-mute, .fc .fc-pad { display: none !important; }
+.fc .fc-ic-pad { width: 38px; }
+.fc .fc-mute.off, .h-mute.off { background: #2feee4; color: #052e2c; }
+.fc .top { justify-content: space-between !important; }
+.fc .controls { gap: 22px; }
+.h-top { justify-content: space-between; }
+.h-mute { width: 36px; height: 36px; border-radius: 50%; display: grid !important; place-items: center; background: #efebe7 !important; color: #082422; }
+/* Captura de tarjeta simulada */
+.fc .ce { display: grid; gap: 8px; margin: 10px 0 4px; }
+.fc .ce-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fc .ce-f { background: #0e2826; border: 1px solid #234743; border-radius: 10px; padding: 8px 10px; }
+.fc .ce-f small { display: block; font-size: 11px; color: #8fb3ad; }
+.fc .ce-f b { font-size: 14px; letter-spacing: .5px; color: #4f6f6a; font-weight: 600; }
+.fc .ce-f.on b { color: #f2fbf9; }
+.fc .btn.apay { background: #000; color: #fff; border-color: #000; }
