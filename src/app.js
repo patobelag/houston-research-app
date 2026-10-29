@@ -897,7 +897,7 @@
   function homeSuggestions() {
     const a = state.account, out = [];
     if (!a.open) {
-      out.push(["bolt", S("Abre tu cuenta Félix, es gratis", "Open your free Félix account"), S("Empezar", "Start"), S("Quiero abrir mi cuenta", "I want to open my account")]);
+      out.push(["mic", S("“¿Cómo funciona la Cuenta Félix?”", "“How does the Félix account work?”"), "", S("¿Cómo funciona la Cuenta Félix?", "How does the Félix account work?")]);
       out.push(["mic", S("“Quiero mandar dinero a México”", "“I want to send money to Mexico”"), "", S("Quiero mandar dinero a México", "I want to send money to Mexico")]);
       return out;
     }
