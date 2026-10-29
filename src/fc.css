@@ -165,3 +165,10 @@
 .h-rrow { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #f1ece4; font-size: 13.5px; }
 .h-rrow span { color: #6b6a63; } .h-rrow b { text-align: right; font-weight: 600; }
 .h-share { display: flex !important; align-items: center; justify-content: center; gap: 8px; margin: 14px 12px 0; width: calc(100% - 24px); padding: 13px !important; border-radius: 999px; background: #082422 !important; color: #2feee4 !important; font-weight: 600; }
+
+/* Botones siempre redondos: no se encogen en pantallas angostas */
+.fc .controls { gap: 10px; padding-left: 0; padding-right: 0; }
+.fc .controls > * { flex: 0 0 auto; }
+.fc #btn-home, .fc #btn-mute, .fc #btn-kb { width: 48px; min-width: 48px; height: 48px; aspect-ratio: 1; padding: 0; }
+.fc .orb { width: 80px; height: 80px; aspect-ratio: 1; flex: 0 0 auto; }
+.fc .fc-pad { width: 48px; min-width: 48px; }
