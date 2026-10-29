@@ -93,8 +93,10 @@
   function introFC() {
     const n = state.user.name;
     return S(
-      `Hola${n ? " " + n : ""}, soy Félix, tu compañero para tu dinero. Hoy mismo puedes abrir tu Cuenta Félix gratis, con tarjeta Visa virtual y 4% anual, o mandar dinero a tu familia sin abrir cuenta. Con tu cuenta abierta también tienes Envía ahora, paga después y préstamos. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. ${n ? "¿Por dónde empezamos?" : "Para empezar, ¿cómo te llamas?"}`,
-      `Hi${n ? " " + n : ""}, I'm Félix, your money companion. Today you can open your free Félix account, with a virtual Visa card and 4% APY, or send money to your family without an account. With your account open you also get Send now, pay later and loans. To talk to me, tap the button and speak; when you're done, tap it again. ${n ? "Where shall we start?" : "To start, what's your name?"}`);
+      n ? `Hola ${n}, soy Félix, tu compañero para tu dinero. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. Conmigo puedes abrir tu Cuenta Félix gratis o mandar dinero a tu familia. ¿Por dónde empezamos?`
+        : `Hola, soy Félix, tu compañero para tu dinero. Para hablarme, toca el botón y habla; cuando termines, tócalo otra vez. Para empezar, ¿cómo te llamas?`,
+      n ? `Hi ${n}, I'm Félix, your money companion. To talk to me, tap the button and speak; when you're done, tap it again. With me you can open your free Félix account or send money to your family. Where shall we start?`
+        : `Hi, I'm Félix, your money companion. To talk to me, tap the button and speak; when you're done, tap it again. To start, what's your name?`);
   }
 
   // ───────── Sesión ─────────
@@ -155,7 +157,7 @@
       const m = text.match(/(?:me llamo|soy|mi nombre es|my name is|i'm|i am)\s+([A-Za-zÁÉÍÓÚÑáéíóúñü]+)/i);
       const nm = m ? m[1] : text.split(/\s+/)[0].replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñü]/g, "");
       msgs.push({ role: "user", text, via }); tools.set_user_name({ name: nm }); render();
-      return felixSays(S(`Mucho gusto, ${state.user.name}. ¿Con qué te ayudo hoy?`, `Nice to meet you, ${state.user.name}. What can I help you with today?`));
+      return felixSays(S(`Mucho gusto, ${state.user.name}. Conmigo puedes abrir tu Cuenta Félix gratis o mandar dinero a tu familia. ¿Por dónde empezamos?`, `Nice to meet you, ${state.user.name}. With me you can open your free Félix account or send money to your family. Where shall we start?`));
     }
     if (via !== "tap") lastVia = via; // tocar una tarjeta no corta la conversación por voz
     Voice.stopSpeaking();
