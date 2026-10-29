@@ -132,6 +132,7 @@
     // FC: usuario nuevo, sin datos. Félix le pregunta el nombre por voz.
     state = FC ? C.seedState("new", prefs.userName || "", { anonymous: true }) : C.seedState(prefs.scenario, prefs.userName);
     namedAt = -1;
+    Home.open = false; Home.view = null; Home.det = false; Home.earned = 0; Home.last = 0; Home.times = {}; cancelAnimationFrame(Home.raf);
     tools = C.makeTools(state, hooks);
     brain = C.makeBrain(state, tools, () => prefs.lang);
     msgs.push({ role: "felix", text: FC ? (state.user.name ? S(`Hola ${state.user.name}, soy Félix. ¿Con qué te ayudo hoy?`, `Hi ${state.user.name}, I'm Félix. What can I help you with today?`) : S("Hola, soy Félix. ¿Cómo te llamas?", "Hi, I'm Félix. What's your name?")) : S(`Hola ${state.user.name}, soy Félix. Puedo enviar dinero a tu familia, cargar dinero a tu cuenta, o enviar hoy y que pagues después. ¿Qué necesitas?`, `Hi ${state.user.name}, I'm Félix. I can send money to your family, add money to your account, or send today so you pay later. What do you need?`) });
@@ -143,6 +144,7 @@
   function userSays(text, via) {
     text = String(text || "").trim();
     if (!text) return;
+    if (FC && Home.open) closeHome();
     if (isEL()) {
       msgs.push({ role: "user", text, via }); EL.lastTyped = text; render();
       if (EL.active()) EL.send(text); else EL.start(text);
@@ -498,11 +500,12 @@
     $("#kb").classList.toggle("on", prefs.kb);
     $("#kb-input").placeholder = t("typeHere");
     $("#kb-send").innerHTML = I("send", 20, 2.2);
+    if (FC) { $("#btn-mute").dataset.lbl = prefs.muted ? S("Activar voz", "Unmute") : S("Silenciar", "Mute"); renderHome(); }
   }
 
   function renderTop() {
     if (FC) {
-      $("#top").innerHTML = `<button class="fc-ic" id="fc-mute" title="${t("mute")}">${I(prefs.muted ? "spkOff" : "spk", 20, 1.8)}</button><img class="logo-img fc-logo" src="/assets/felix-logotype.svg" alt="Félix"><button class="fc-ic" id="fc-help" title="${S("Ayuda", "Help")}">${I("help", 20, 1.8)}</button>`;
+      $("#top").innerHTML = `<img class="logo-img fc-logo" src="/assets/felix-logotype.svg" alt="Félix">`;
       return;
     }
     const a = state.account;
@@ -844,6 +847,165 @@
     return "";
   }
 
+  // ───────── Home Cuenta Félix (solo FC) ─────────
+  // Tablero de estado: saldo que gana 4% anual en vivo, tarjetas, ganancias, sugerencias y actividad.
+  // Las acciones se hacen con Félix por voz; el home solo muestra y lleva a Félix.
+  const APY = 0.04, SEC_YEAR = 365 * 86400;
+  const Home = { open: false, view: null, sel: null, det: false, raf: 0, earned: 0, last: 0, times: {} };
+  const HI = {
+    home: '<path d="M4 11 12 4l8 7"/><path d="M6 9.5V20h12V9.5"/>',
+    chat: '<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12Z"/>',
+    chev: '<path d="m9 5 7 7-7 7"/>', back: '<path d="m15 5-7 7 7 7"/>',
+    eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+    up: '<path d="M7 17 17 7M9 7h8v8"/>', send: '<path d="M21 3 10 14M21 3l-7 18-4-7-7-4 18-7Z"/>',
+    cash: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>', cal: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    mic: '<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>',
+    snow: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5"/>',
+    lash: '<path d="M3 11c2.5 3 5.5 4.5 9 4.5s6.5-1.5 9-4.5M6 14l-1.5 2M12 15.5V18M18 14l1.5 2"/>',
+    wallet: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M3 8l14-4"/>',
+    chat2: '<path d="M5 3h3.5l1.8 4.5-2.3 1.6a11 11 0 0 0 5 5l1.6-2.3L19 13.5V17a2 2 0 0 1-2.2 2A15 15 0 0 1 3 5.2 2 2 0 0 1 5 3Z"/>',
+    bolt: '<path d="M13 3 5 13h6l-1 8 8-10h-6l1-8Z"/>', share: '<path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>',
+    x: '<path d="M6 6l12 12M18 6 6 18"/>', check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  };
+  const HIc = (n, s = 20, w = 1.8) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${HI[n]}</svg>`;
+  const WAVE = `<svg class="h-wave" viewBox="0 0 369 22" preserveAspectRatio="none"><path d="M0 0H60.69C81.88 0 102.94 3.36 123.09 9.95C163.55 23.19 207.17 23.19 247.63 9.95C267.78 3.36 288.84 0 310.03 0H369V22H0Z" fill="#fff"/></svg>`;
+  const dLabel = (d) => new Date(d).toLocaleDateString(prefs.lang === "en" ? "en-US" : "es-MX", { day: "numeric", month: "short" });
+  const nowTime = () => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+  // Interés: se acumula con el saldo real, segundo a segundo. 5 dígitos = décimas de millonésima de dólar.
+  function accrue() {
+    const now = performance.now();
+    if (Home.last && state && state.account.open) Home.earned += state.account.balance * APY / SEC_YEAR * (now - Home.last) / 1000;
+    Home.last = now;
+  }
+  function balParts() {
+    const units = Math.round(((state.account.open ? state.account.balance : 0) + Home.earned) * 1e7);
+    const cents = Math.floor(units / 1e5);
+    return { int: Math.floor(cents / 100).toLocaleString("en-US"), dec: String(cents % 100).padStart(2, "0"), micro: String(units % 1e5).padStart(5, "0") };
+  }
+  function tickHome() {
+    accrue();
+    const p = balParts();
+    const b = document.querySelector("#home [data-bal]");
+    if (b) { b.querySelector("[data-int]").textContent = p.int; b.querySelector("[data-dec]").textContent = p.dec; b.querySelector("[data-micro]").innerHTML = p.micro.split("").map((d) => `<span>${d}</span>`).join(""); }
+    const e = document.querySelectorAll("#home [data-earned]");
+    e.forEach((x) => { x.textContent = "$" + Home.earned.toFixed(7); });
+    Home.raf = Home.open ? requestAnimationFrame(tickHome) : 0;
+  }
+
+  function homeSuggestions() {
+    const a = state.account, out = [];
+    if (!a.open) {
+      out.push(["bolt", S("Abre tu cuenta Félix, es gratis", "Open your free Félix account"), S("Empezar", "Start"), S("Quiero abrir mi cuenta", "I want to open my account")]);
+      out.push(["mic", S("“Quiero mandar dinero a México”", "“I want to send money to Mexico”"), "", S("Quiero mandar dinero a México", "I want to send money to Mexico")]);
+      return out;
+    }
+    if (a.card && a.card.frozen) out.push(["snow", S("Tu tarjeta está congelada", "Your card is frozen"), S("Descongelar", "Unfreeze"), S("Descongela mi tarjeta", "Unfreeze my card")]);
+    if (state.snplActive && state.snpl && state.snpl.plan) out.push(["cal", S(`Tu cuota de ${money(state.snpl.plan.each)} es el ${dLabel(state.snpl.plan.dates[0])}`, `Your ${money(state.snpl.plan.each)} payment is due ${dLabel(state.snpl.plan.dates[0])}`), S("Preguntar", "Ask"), S("¿Cuándo pago mi cuota y cuánto debo?", "When is my payment and how much do I owe?")]);
+    if (state.loan8) out.push(["cal", S(`Tu pago semanal de ${money(state.loan8.each)} es el ${dLabel(state.loan8.first)}`, `Your ${money(state.loan8.each)} weekly payment is due ${dLabel(state.loan8.first)}`), S("Preguntar", "Ask"), S("¿Cuándo es mi próximo pago del préstamo?", "When is my next loan payment?")]);
+    if (a.balance <= 0 && !state.movements.length) out.push(["plus", S("Carga dinero y empieza a ganar 4%", "Add money and start earning 4%"), S("Cargar", "Add"), S("Quiero cargar dinero a mi cuenta", "I want to add money to my account")]);
+    const r = state.recipients[0];
+    const phrase = r ? S(`Mándale 50 a ${r.name.split(" ")[0]}`, `Send 50 to ${r.name.split(" ")[0]}`) : S("Quiero mandar dinero a México", "I want to send money to Mexico");
+    out.push(["mic", `“${phrase}”`, "", phrase]);
+    if (!state.loan8 && !state.snplActive && out.length < 2) out.push(["mic", S("“Necesito un préstamo de 150”", "“I need a $150 loan”"), "", S("Necesito un préstamo de 150 dólares", "I need a $150 loan")]);
+    return out.slice(0, 2);
+  }
+  function mvIcon(m) { const tt = tr(m.title); return /Envío|Transfer/.test(tt) ? "send" : /Préstamo|Crédito|loan/i.test(tt) ? "cash" : /Carga|added/.test(tt) ? "plus" : "bolt"; }
+  function mvTime(m) { if (!Home.times[m.id]) Home.times[m.id] = nowTime(); return Home.times[m.id]; }
+
+  function homeMain() {
+    const a = state.account, p = balParts(), card = a.open && a.card;
+    const nm = (state.user.name || "").trim();
+    const ini = nm ? nm.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase() : "·";
+    const sugg = homeSuggestions().map(([ic, txt, act, say]) => `<button class="h-sg" data-hsay="${esc(say)}"><i>${HIc(ic, 17)}</i><span>${esc(txt)}</span>${act ? `<b>${esc(act)}</b>` : ""}</button>`).join("");
+    const mv = state.movements.map((m, i) => `<button class="h-tr" data-hmv="${i}"><span class="ic">${HIc(mvIcon(m), 19)}</span><span class="tx"><b>${esc(tr(m.title))}</b><span>${esc(tr(m.date))} · ${mvTime(m)}${state.transfers[m.id] ? " · " + S("Ver recibo", "See receipt") : ""}</span></span><span class="am ${m.amount > 0 ? "in" : ""}">${m.amount < 0 ? "−" : "+"}${money(Math.abs(m.amount))}</span></button>`).join("");
+    return `<div class="h-top">${nm ? `<span class="h-av">${esc(ini)}</span>` : ""}</div>
+      <div class="h-dash">
+        ${card ? `<button class="h-dtop" data-hview="cards"><span>${S("Tus tarjetas", "Your cards")}</span>${HIc("chev", 18)}</button>` : `<div class="h-dtop"><span>${S("Cuenta Félix", "Félix account")}</span></div>`}
+        <div class="h-dbody">${WAVE}
+          <div class="h-ballbl">${S("Saldo total", "Total balance")} <i>${HIc("eye", 15)}</i></div>
+          <div class="h-balrow"><div class="h-bal" data-bal><span class="b1">$<span data-int>${p.int}</span></span><span class="b2">.</span><span class="b3" data-dec>${p.dec}</span><span class="b4" data-micro>${p.micro.split("").map((d) => `<span>${d}</span>`).join("")}</span></div>${a.open ? `<button class="h-balgo" data-hview="earn" aria-label="${S("Ganancias", "Earnings")}">${HIc("chev", 22)}</button>` : ""}</div>
+          ${a.open ? `<button class="h-earn" data-hview="earn">${S("Ganando <b>4%</b> anual", "Earning <b>4%</b> APY")} · +<span data-earned>$${Home.earned.toFixed(7)}</span> ${S("hoy", "today")} ${HIc("up", 13, 2)}</button>`
+            : `<button class="h-open" data-hsay="${esc(S("Quiero abrir mi cuenta", "I want to open my account"))}">${S("Abre tu cuenta", "Open your account")}</button>`}
+        </div>
+      </div>
+      <div class="h-sec">${S("Pídele a Félix", "Ask Félix")}</div>
+      <div class="h-sgs">${sugg}</div>
+      <div class="h-sec h-act">${S("Actividad", "Activity")}</div>
+      ${mv || `<div class="h-empty">${S("Aquí verás tus movimientos.", "Your activity will show up here.")}</div>`}
+      <div style="height:16px"></div>`;
+  }
+
+  function homeCards() {
+    const c = state.account.card, nm = (state.kyc && state.kyc.fullName) || state.user.name || "";
+    const tg = (on) => `<span class="h-tgl ${on ? "on" : ""}"></span>`;
+    return `<div class="h-head"><button class="h-back" data-hview="main" aria-label="${S("Atrás", "Back")}">${HIc("back", 18)}</button><b>${S("Tus tarjetas", "Your cards")}</b><span></span></div>
+      <div class="h-fcard ${c.frozen ? "frozen" : ""}"><div class="in"><img src="/assets/felix-logotype.svg" alt="Félix"><small>${S("Débito", "Debit")}</small><span class="h-badge">${S("Virtual", "Virtual")}</span><span class="num">${Home.det ? "5430 0146 0340 " + c.last4 : "···· " + c.last4}</span><span class="visa">VISA</span></div>${c.frozen ? `<div class="ice"><i>${HIc("snow", 22, 1.6)}</i></div>` : ""}</div>
+      ${Home.det ? `<div class="h-det"><div><small>${S("Titular", "Cardholder")}</small><b>${esc(nm.toUpperCase())}</b></div><div><small>${S("Vence", "Expires")}</small><b>10/30</b></div><div><small>CVC</small><b>352</b></div></div>` : ""}
+      <div class="h-rows">
+        <button class="h-row" data-hcard="det"><i>${HIc("lash")}</i><span>${S("Ver detalles de tarjeta", "Show card details")}</span>${tg(Home.det)}</button>
+        <button class="h-row" data-hcard="frz"><i>${HIc("snow")}</i><span>${S("Congelar tarjeta", "Freeze card")}</span>${tg(c.frozen)}</button>
+        <button class="h-row" data-hcard="wallet"><i>${HIc("wallet")}</i><span>${S("Agregar a Apple Wallet", "Add to Apple Wallet")}</span>${HIc("chev", 18)}</button>
+        <button class="h-row" data-hsay="${esc(S("Tengo un problema con mi tarjeta", "I have a problem with my card"))}"><i>${HIc("chat")}</i><span>${S("Pedirle ayuda a Félix", "Ask Félix for help")}</span>${HIc("chev", 18)}</button>
+      </div>
+      <p class="h-note">${S("Tu tarjeta física llega por correo. Mientras, usa la virtual.", "Your physical card arrives by mail. Use the virtual one meanwhile.")}</p>`;
+  }
+
+  function homeEarn() {
+    const b = state.account.balance;
+    const tile = (l, v) => `<div class="h-tile"><small>${l}</small><b>${v}</b></div>`;
+    const fmt = (v) => v < 0.01 ? "$" + v.toFixed(4) : money(v);
+    return `<div class="h-head"><button class="h-back" data-hview="main" aria-label="${S("Atrás", "Back")}">${HIc("back", 18)}</button><b>${S("Ganancias", "Earnings")}</b><span></span></div>
+      <div class="h-earnbox"><small>${S("Ganado desde que abriste la app", "Earned since you opened the app")}</small><div class="big">+<span data-earned>$${Home.earned.toFixed(7)}</span></div><span class="h-earn static">${S("Ganando <b>4%</b> anual", "Earning <b>4%</b> APY")}</span></div>
+      <div class="h-sec">${S("Con tu saldo de hoy", "With today's balance")} (${money(b)})</div>
+      <div class="h-tiles">${tile(S("Al día", "Per day"), fmt(b * APY / 365))}${tile(S("Al mes", "Per month"), fmt(b * APY / 12))}${tile(S("Al año", "Per year"), fmt(b * APY))}</div>
+      <p class="h-note">${S("Ganas 4% anual sobre tu saldo y se deposita en tu cuenta cada día. Mientras más tengas, más rápido suben los números.", "You earn 4% a year on your balance, deposited daily. The more you keep, the faster it grows.")}</p>
+      <div class="h-rows"><button class="h-row" data-hsay="${esc(S("Quiero cargar dinero a mi cuenta", "I want to add money to my account"))}"><i>${HIc("plus")}</i><span>${S("Cargar dinero con Félix", "Add money with Félix")}</span>${HIc("chev", 18)}</button></div>`;
+  }
+
+  function homeReceipt() {
+    const m = state.movements[Home.sel];
+    if (!m) return homeMain();
+    const tx = state.transfers[m.id];
+    const head = `<div class="h-head"><button class="h-back" data-hview="main" aria-label="${S("Atrás", "Back")}">${HIc("back", 18)}</button><b>${tx ? S("Recibo", "Receipt") : S("Detalle", "Details")}</b><span></span></div>`;
+    if (!tx) return head + `<div class="h-rcpt"><div class="amt">${m.amount < 0 ? "−" : "+"}${money(Math.abs(m.amount))}</div><div class="h-rrow"><span>${S("Concepto", "Description")}</span><b>${esc(tr(m.title))}</b></div><div class="h-rrow"><span>${S("Fecha", "Date")}</span><b>${esc(tr(m.date))} · ${mvTime(m)}</b></div></div>`;
+    const r = recOf(tx.rid) || { name: "", country: "MX", method: "" }, c = C.CONFIG.rates[r.country] || C.CONFIG.rates.MX;
+    const stepTxt = [S("Enviado", "Sent"), S("En camino", "On the way"), S("Entregado", "Delivered")][tx.step || 0];
+    const via = tx.via === "snpl" ? S("Envía ahora, paga después", "Send now, pay later") : tx.via === "paylater" ? S("Paga después", "Pay later") : S("Saldo o débito", "Balance or debit");
+    const rows = [[S("Para", "To"), r.name], [S("Envías", "You send"), money(tx.amount)], [S("Recibe", "They get"), `${c.sym}${Number(tx.receive).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${c.cur}`], [S("Tipo de cambio", "Rate"), `1 USD = ${c.rate} ${c.cur}`], [S("Comisión", "Fee"), money(C.CONFIG.fee)], [S("Método", "Method"), tr(r.method)], [S("Pagado con", "Paid with"), via], [S("Folio", "Reference"), tx.ref], [S("Fecha", "Date"), `${tr(m.date)} · ${mvTime(m)}`]];
+    return head + `<div class="h-rcpt"><span class="h-st s${tx.step || 0}">${HIc(tx.step === 2 ? "check" : "send", 14, 2.2)} ${stepTxt}</span><div class="amt">${money(tx.amount)}</div>${rows.map(([l, v]) => `<div class="h-rrow"><span>${l}</span><b>${esc(v || "")}</b></div>`).join("")}</div>
+      <button class="h-share" data-hshare="${Home.sel}">${HIc("share", 18)} ${S("Compartir recibo", "Share receipt")}</button>`;
+  }
+
+  function renderHome() {
+    if (!FC) return;
+    const el = $("#home");
+    $("#screen").classList.toggle("home-open", Home.open);
+    el.hidden = !Home.open;
+    const hb = $("#btn-home");
+    hb.innerHTML = HIc(Home.open ? "chat" : "home", 22); hb.dataset.lbl = Home.open ? "Félix" : S("Inicio", "Home"); hb.classList.toggle("on", Home.open);
+    if (!Home.open) return;
+    if (Home.view === "cards" && !(state.account.open && state.account.card)) Home.view = "main";
+    const html = Home.view === "cards" ? homeCards() : Home.view === "earn" ? homeEarn() : Home.view === "rcpt" ? homeReceipt() : homeMain();
+    if (el.dataset.h !== html) { const keep = el.dataset.v === Home.view ? el.scrollTop : 0; el.innerHTML = html; el.dataset.h = html; el.dataset.v = Home.view; el.scrollTop = keep; }
+  }
+  function openHome() {
+    if (status === "listening") { if (isEL()) EL.toggleMic(); else { Voice.stopAll(); setStatus("idle"); setCaption(""); } }
+    Home.open = true; Home.view = "main"; prefs.kb = false; render();
+    cancelAnimationFrame(Home.raf); Home.raf = requestAnimationFrame(tickHome);
+  }
+  function closeHome() { if (!Home.open) return; Home.open = false; Home.det = false; cancelAnimationFrame(Home.raf); render(); }
+  function shareReceipt(i) {
+    const m = state.movements[i], tx = m && state.transfers[m.id];
+    if (!tx) return;
+    const r = recOf(tx.rid) || { name: "" }, c = C.CONFIG.rates[r.country] || C.CONFIG.rates.MX;
+    const text = S(`Recibo Félix ${tx.ref}: enviaste ${money(tx.amount)} a ${r.name}. Recibe ${c.sym}${tx.receive} ${c.cur}.`, `Félix receipt ${tx.ref}: you sent ${money(tx.amount)} to ${r.name}. They get ${c.sym}${tx.receive} ${c.cur}.`);
+    if (navigator.share) navigator.share({ title: "Félix", text }).catch(() => {});
+    else { try { navigator.clipboard.writeText(text); } catch (e) {} toast(t("shared")); }
+  }
+  setInterval(() => { if (state && !Home.open) accrue(); }, 1000);
+
   // ───────── Tamaño del teléfono ─────────
   function fit() {
     const wrap = $("#phone-wrap");
@@ -854,6 +1016,27 @@
 
   // ───────── Eventos ─────────
   document.addEventListener("click", (e) => {
+    const hs = e.target.closest("[data-hsay]");
+    if (hs) { closeHome(); userSays(hs.dataset.hsay, "tap"); return; }
+    const hv = e.target.closest("[data-hview]");
+    if (hv) { Home.view = hv.dataset.hview; Home.det = false; renderHome(); return; }
+    const hm = e.target.closest("[data-hmv]");
+    if (hm) { Home.sel = +hm.dataset.hmv; Home.view = "rcpt"; renderHome(); return; }
+    const hsh = e.target.closest("[data-hshare]");
+    if (hsh) { shareReceipt(+hsh.dataset.hshare); return; }
+    const hc = e.target.closest("[data-hcard]");
+    if (hc) {
+      const k = hc.dataset.hcard, card = state.account.card;
+      if (k === "det") Home.det = !Home.det;
+      if (k === "frz" && card) {
+        card.frozen = !card.frozen;
+        toast(card.frozen ? S("Tarjeta congelada", "Card frozen") : S("Tarjeta activa", "Card active"));
+        EL.context(card.frozen ? "The user just froze their debit card from the cards screen." : "The user just unfroze their debit card from the cards screen.");
+      }
+      if (k === "wallet") toast(S("En la app real se agrega a Apple Wallet", "In the real app it's added to Apple Wallet"));
+      renderHome(); return;
+    }
+    if (e.target.closest("#btn-home")) { if (Home.open) closeHome(); else openHome(); return; }
     const say = e.target.closest("[data-say]");
     if (say) { userSays(say.dataset.say, "tap"); return; }
     if (e.target.closest("#btn-cc")) { prefs.captions = !prefs.captions; render(); return; }
@@ -878,14 +1061,14 @@
       if (id === "seg-engine") { prefs.engine = v; resetSession(); }
     }
   });
-  $("#orb").addEventListener("click", onOrb);
+  $("#orb").addEventListener("click", () => { closeHome(); onOrb(); });
   $("#reset").addEventListener("click", resetSession);
-  $("#btn-kb").addEventListener("click", () => { prefs.kb = !prefs.kb; if (prefs.kb && status === "listening") { Voice.stopAll(); setStatus("idle"); setCaption(""); } render(); if (prefs.kb) $("#kb-input").focus(); });
+  $("#btn-kb").addEventListener("click", () => { closeHome(); prefs.kb = !prefs.kb; if (prefs.kb && status === "listening") { Voice.stopAll(); setStatus("idle"); setCaption(""); } render(); if (prefs.kb) $("#kb-input").focus(); });
   $("#btn-mute").addEventListener("click", () => { prefs.muted = !prefs.muted; EL.setMuted(prefs.muted); if (!isEL() && prefs.muted && status === "speaking") { Voice.stopSpeaking(); setStatus("idle"); } toast(t(prefs.muted ? "muteOn" : "muteOff")); render(); });
   $("#btn-hf").addEventListener("click", () => { prefs.handsFree = !prefs.handsFree; toast(t(prefs.handsFree ? "hfOn" : "hfOff")); render(); });
   $("#btn-human").addEventListener("click", () => userSays(S("Necesito ayuda", "I need help"), "tap"));
   $("#kb").addEventListener("submit", (e) => { e.preventDefault(); const v = $("#kb-input").value; $("#kb-input").value = ""; userSays(v, "kb"); });
-  document.addEventListener("keydown", (e) => { if (e.code === "Space" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); onOrb(); } });
+  document.addEventListener("keydown", (e) => { if (e.code === "Space" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); closeHome(); onOrb(); } });
   window.addEventListener("resize", fit);
 
   // Parámetros de URL: ?s=new|steady&lang=es|en&theme=dark
