@@ -139,5 +139,34 @@ s = session("steady", "en");
 o = s.say("send a hundred dollars to my sister");
 check("EN envío", /\$100 to your sister/.test(o), o);
 
+// 10. Flujos reales (FC): KYC mínimo, remesa con datos completos, SNPL como método de pago, préstamo a la cuenta
+{
+  const st = C.seedState("new", "", { anonymous: true });
+  const T = C.makeTools(st, { lang: () => "es", card: () => "c", update() {}, later(ms, f) { f(); }, notify() {} });
+  check("no abre cuenta sin KYC", T.open_account().status === "missing");
+  T.accept_terms(); T.save_identity({ full_name: "Ana Prueba López", birth_date: "3 de mayo de 1990" });
+  check("ID no aceptada", T.start_id_check({ id_type: "credencial del trabajo" }).status === "not_accepted");
+  check("ID aceptada", T.start_id_check({ id_type: "matrícula consular" }).status === "waiting_for_scan");
+  st.kyc.verified = true;
+  check("cuenta abierta con KYC", T.open_account().status === "opened");
+  check("destinatario pide método", T.add_recipient({ full_name: "Lupe Martínez", country: "México" }).status === "need_method");
+  check("CLABE inválida", T.add_recipient({ full_name: "Lupe Martínez", country: "México", method: "bank", bank: "BBVA", account_number: "123" }).status === "invalid_clabe");
+  check("destinatario con CLABE de prueba", T.add_recipient({ full_name: "Lupe Martínez", country: "México", method: "bank", bank: "BBVA", use_test_account: true }).status === "ok");
+  check("SNPL pide tarjeta", T.payment_options({ recipient: "Lupe", amount_usd: 100 }).options.snpl.reason === "needs_debit_card_for_fees");
+  T.add_debit_card();
+  check("SNPL no pasa del aprobado", T.snpl_start({ recipient: "Lupe", amount_usd: 200 }).reason === "over_approved_amount");
+  T.snpl_start({ recipient: "Lupe", amount_usd: 100 });
+  check("SNPL rechaza PO Box", T.snpl_submit_application({ address: "PO Box 12", esign_accepted: true }).status === "po_box_not_allowed");
+  const ap = T.snpl_submit_application({ address: "123 Main St, Houston", esign_accepted: true });
+  check("SNPL aprobado con términos reales", ap.status === "approved" && ap.pay_today_usd === 12.99 && ap.installment_usd === 25 && ap.total_usd === 112.99, JSON.stringify(ap));
+  check("SNPL pide autopago", T.snpl_accept_terms({ accepted: true }).status === "need_autopay_choice");
+  check("SNPL listo", T.snpl_accept_terms({ accepted: true, autopay: false }).status === "ready");
+  check("SNPL enviado", T.confirm_pending().via === "snpl" && st.snplActive);
+  check("un préstamo a la vez", T.payment_options({ recipient: "Lupe", amount_usd: 50 }).options.snpl.reason === "one_active_loan_at_a_time");
+  const lo = T.offer_cash_loan({ amount_usd: 150 });
+  check("préstamo 8 semanas tabla real", lo.payment_usd === 18.88 && lo.total_usd === 153, JSON.stringify(lo));
+  check("préstamo depositado", T.confirm_pending().status === "disbursed" && st.account.balance === 150);
+}
+
 console.log(fails ? `\n${fails} fallas` : "\nTodo bien");
 process.exit(fails ? 1 : 0);
