@@ -690,6 +690,7 @@
     freeze: /\b(congel\w*|bloque\w*|freeze|lock|perdi mi tarjeta|me robaron|lost my card|stolen)\b/,
     card: /\b(tarjeta|card)\b/,
     movements: /\b(movimientos|historial|actividad|transacciones|ultimos gastos|activity|transactions|history)\b/,
+    offtopic: /\b(hamburguesa|hamburguesas|pizza|tacos?|comida|cena|desayuno|restaurante|cafe|uber|lyft|taxi|carro|coche|raite|ride|vuelo|boleto|hotel|clima|chiste|pelicula|cancion|musica|receta|futbol|partido|burger|food|car|flight|weather|joke|movie|song)\b/,
     installment: /\b((pag\w*|abon\w*|pay)\b.*\b(prestamo|cuota|loan|installment|credito|mensualidad|lo que debo))|\b(mi cuota|my installment|lo que debo|what i owe)\b/,
     payLater: /\b(paga\w* despues|pago despues|pay later|envia\w* hoy|send now|a credito|fiado)\b/,
     loan: /\b(prestamo|credito|prestame|presta|prestas|adelanto|necesito dinero|me falta dinero|loan|borrow|lend|advance)\b/,
@@ -871,6 +872,10 @@
     function handle(raw) {
       const t = norm(raw);
       if (!t) return S("No te escuché. ¿Me repites?", "I didn't catch that. Can you repeat?");
+      // Fuera de tema (comida, transporte, clima…): respuesta tranquila y regresa a lo financiero
+      if (RX.offtopic.test(t) && !RX.send.test(t) && !RX.loan.test(t)) return S(
+        "Jaja, eso no lo hago yo. Lo mío es tu dinero: tu cuenta, mandar dinero a tu familia o un préstamo. ¿Te ayudo con algo de eso?",
+        "Ha, that's not something I do. My thing is your money: your account, sending money to your family or a loan. Can I help with any of that?");
 
       // Cancelación siempre gana si hay algo pendiente
       if (state.pending && RX.no.test(t)) return cancel();

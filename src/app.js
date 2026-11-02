@@ -2,6 +2,21 @@
    Motor intercambiable: "demo" hoy, "eleven" en fase 2 con las mismas tools. */
 (function () {
   "use strict";
+  // Silencio real: guardamos cada <audio>/<video> que se cree (ElevenLabs reproduce por ahí) para poder silenciarlo
+  const mediaEls = new Set();
+  let outMuted = false;
+  (function trackMedia() {
+    const ce = document.createElement.bind(document);
+    document.createElement = function (tag, o) { const el = ce(tag, o); if (/^(audio|video)$/i.test(String(tag))) { mediaEls.add(el); el.muted = outMuted; } return el; };
+    if (window.Audio) { const A = window.Audio; window.Audio = function (src) { const a = new A(src); mediaEls.add(a); a.muted = outMuted; return a; }; window.Audio.prototype = A.prototype; }
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () { mediaEls.add(this); this.muted = outMuted; return play.apply(this, arguments); };
+  })();
+  function setOutputMuted(m) {
+    outMuted = !!m;
+    document.querySelectorAll("audio,video").forEach((el) => mediaEls.add(el));
+    mediaEls.forEach((el) => { try { el.muted = outMuted; } catch (e) {} });
+  }
   const C = window.FelixCore;
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -56,6 +71,8 @@
   const FC = !!window.__FC__; // link "Fully conversational": solo Félix, sin pantallas
   const prefs = { scenario: "steady", lang: "es", theme: "light", engine: "demo", handsFree: false, muted: false, kb: false, captions: false };
   const t = (k) => UI[prefs.lang][k] || k;
+  // Félix no habla si la persona lo silenció o si está escribiendo (modo 100% escrito)
+  const silent = () => prefs.muted || prefs.kb;
   const S = (es, en) => (prefs.lang === "en" ? en : es);
   const tr = (v) => C.tr(v, prefs.lang);
   const money = (n) => C.money(n, prefs.lang);
@@ -155,6 +172,12 @@
     started = true;
     if (FC && !state.user.name) {
       const m = text.match(/(?:me llamo|soy|mi nombre es|my name is|i'm|i am)\s+([A-Za-zÁÉÍÓÚÑáéíóúñü]+)/i);
+      // Si no suena a un nombre (frase larga), Félix responde y vuelve a pedir el nombre
+      if (!m && text.trim().split(/\s+/).length > 3) {
+        msgs.push({ role: "user", text, via });
+        const off = /hamburguesa|pizza|tacos?|comida|uber|taxi|carro|coche|clima|chiste|burger|food|car|weather/i.test(text);
+        return felixSays(off ? S("Jaja, eso no lo hago yo, lo mío es tu dinero. Antes de empezar, ¿cómo te llamas?", "Ha, that's not something I do, my thing is your money. Before we start, what's your name?") : S("Con gusto te ayudo. Antes, ¿cómo te llamas?", "Happy to help. First, what's your name?"));
+      }
       const nm = m ? m[1] : text.split(/\s+/)[0].replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñü]/g, "");
       msgs.push({ role: "user", text, via }); tools.set_user_name({ name: nm }); render();
       return felixSays(S(`Mucho gusto, ${state.user.name}. Conmigo puedes abrir tu Cuenta Félix gratis o mandar dinero a tu familia. ¿Por dónde empezamos?`, `Nice to meet you, ${state.user.name}. With me you can open your free Félix account or send money to your family. Where shall we start?`));
@@ -182,7 +205,7 @@
     msgs.push({ role: "felix", text });
     (opts.cards || []).forEach((id) => msgs.push({ role: "card", id }));
     render();
-    if (prefs.muted || !started) { setStatus("idle"); afterFelix(); return; }
+    if (silent() || !started) { setStatus("idle"); afterFelix(); return; }
     setStatus("speaking");
     Voice.speak(text, prefs.lang).then((completed) => {
       if (status !== "speaking") return; // interrumpido
@@ -216,6 +239,7 @@
   }
 
   function onOrb() {
+    if (prefs.kb) { prefs.kb = false; render(); }
     if (isEL()) {
       if (EL.connecting) return;
       if (EL.active()) EL.toggleMic(); else EL.start();
@@ -441,12 +465,12 @@
               console.error("ElevenLabs desconectó al inicio", d);
               toast(t("elFail")); prefs.engine = "demo"; render();
               const intro = introText(); msgs.push({ role: "felix", text: intro }); render();
-              if (!prefs.muted) { setStatus("speaking"); Voice.speak(intro, prefs.lang).then(() => { if (status === "speaking") setStatus("idle"); }); }
+              if (!silent()) { setStatus("speaking"); Voice.speak(intro, prefs.lang).then(() => { if (status === "speaking") setStatus("idle"); }); }
             }
           },
           onError: (e) => { console.error("ElevenLabs", e); },
         });
-        if (prefs.muted) { try { conv.setVolume({ volume: 0 }); } catch (e) {} }
+        api.setMuted(silent());
         // Push to talk: el micrófono arranca cerrado. Se abre al tocar el botón.
         micOpen = false; enforceMute();
         // El micrófono de WebRTC se publica unos instantes después de conectar: reforzamos el silencio
@@ -475,7 +499,7 @@
     };
     api.cleanup = () => { micOpen = false; clearInterval(muteT); flush(); conv = null; api.connecting = false; cancelAnimationFrame(raf); setLvl(0); if (status !== "idle") setStatus("idle"); };
     api.stop = () => { const c = conv; api.cleanup(); if (c) { try { c.endSession(); } catch (e) {} } };
-    api.setMuted = (m) => { try { conv && conv.setVolume({ volume: m ? 0 : 1 }); } catch (e) {} };
+    api.setMuted = (m) => { setOutputMuted(m); try { conv && conv.setVolume({ volume: m ? 0 : 1 }); } catch (e) {} };
     return api;
   })();
 
@@ -518,6 +542,7 @@
     $("#eng-el-note").textContent = elReady === false ? " · " + t("elNotSet") : "";
     $("#btn-human").innerHTML = I("help", 22, 1.8); $("#btn-human").title = S("Ayuda", "Help");
     $("#kb").classList.toggle("on", prefs.kb);
+    EL.setMuted(silent());
     $("#kb-input").placeholder = t("typeHere");
     $("#kb-send").innerHTML = I("send", 20, 2.2);
     if (FC) { renderTop(); $("#btn-mute").dataset.lbl = prefs.muted ? S("Activar voz", "Unmute") : S("Silenciar", "Mute"); renderHome(); }
@@ -1105,8 +1130,22 @@
   });
   $("#orb").addEventListener("click", () => { closeHome(); onOrb(); });
   $("#reset").addEventListener("click", resetSession);
-  $("#btn-kb").addEventListener("click", () => { closeHome(); prefs.kb = !prefs.kb; if (prefs.kb && status === "listening") { Voice.stopAll(); setStatus("idle"); setCaption(""); } render(); if (prefs.kb) $("#kb-input").focus(); });
-  $("#btn-mute").addEventListener("click", () => { prefs.muted = !prefs.muted; EL.setMuted(prefs.muted); if (!isEL() && prefs.muted && status === "speaking") { Voice.stopSpeaking(); setStatus("idle"); } toast(t(prefs.muted ? "muteOn" : "muteOff")); render(); });
+  $("#btn-kb").addEventListener("click", () => {
+    closeHome(); prefs.kb = !prefs.kb;
+    if (prefs.kb) {
+      // Modo escrito: Félix deja de hablar y responde solo con texto
+      if (status === "listening") { if (isEL()) EL.toggleMic(); else Voice.stopAll(); setStatus("idle"); setCaption(""); }
+      if (status === "speaking" && !isEL()) { Voice.stopSpeaking(); setStatus("idle"); }
+      if (FC) toast(S("Modo escrito: Félix te responde solo por escrito", "Typing mode: Félix answers in text only"));
+    }
+    render(); if (prefs.kb) $("#kb-input").focus();
+  });
+  $("#btn-mute").addEventListener("click", () => {
+    prefs.muted = !prefs.muted;
+    EL.setMuted(silent());
+    if (silent() && status === "speaking" && !isEL()) { Voice.stopSpeaking(); setStatus("idle"); }
+    toast(t(prefs.muted ? "muteOn" : "muteOff")); render();
+  });
   $("#btn-hf").addEventListener("click", () => { prefs.handsFree = !prefs.handsFree; toast(t(prefs.handsFree ? "hfOn" : "hfOff")); render(); });
   $("#btn-human").addEventListener("click", () => userSays(S("Necesito ayuda", "I need help"), "tap"));
   $("#kb").addEventListener("submit", (e) => { e.preventDefault(); const v = $("#kb-input").value; $("#kb-input").value = ""; userSays(v, "kb"); });
@@ -1151,7 +1190,7 @@
     if (isEL()) { EL.start(); return; }
     introDone = true;
     msgs = [{ role: "felix", text: introText() }]; render();
-    if (!prefs.muted) { setStatus("speaking"); Voice.speak(introText(), prefs.lang).then(() => { if (status === "speaking") setStatus("idle"); }); }
+    if (!silent()) { setStatus("speaking"); Voice.speak(introText(), prefs.lang).then(() => { if (status === "speaking") setStatus("idle"); }); }
   }
   prefs.userName = cleanName(q.get("name")) || null;
 

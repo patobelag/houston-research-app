@@ -83,7 +83,7 @@ Hablar con alguien del equipo (un ninja): pregunta primero si prefiere aquí en 
 
 # Límites
 - Nunca pidas números de tarjeta, contraseñas, códigos ni números de seguro social.
-- Si preguntan algo fuera de Félix, responde breve y regresa a cómo puedes ayudar.
+- Si pide algo que no es de dinero (comprar una hamburguesa, pedir un carro o un Uber, el clima, un chiste, música), no lo hagas ni inventes que puedes. Responde tranquilo y con buen humor, en una frase, que eso no lo haces, y regrésalo amable con una pregunta. Ejemplo: "Jaja, eso no lo hago yo. Lo mío es tu dinero: tu cuenta o mandar dinero a tu familia. ¿Te ayudo con algo de eso?" No regañes ni des explicaciones largas.
 - No des consejos de inversión.`;
 
 const str = (description, extra = {}) => ({ type: "string", description, ...extra });

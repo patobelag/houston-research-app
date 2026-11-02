@@ -145,15 +145,16 @@ check("EN envío", /\$100 to your sister/.test(o), o);
   const T = C.makeTools(st, { lang: () => "es", card: () => "c", update() {}, later(ms, f) { f(); }, notify() {} });
   check("no abre cuenta sin KYC", T.open_account().status === "missing");
   T.accept_terms(); T.save_identity({ full_name: "Ana Prueba López", birth_date: "3 de mayo de 1990" });
-  check("ID no aceptada", T.start_id_check({ id_type: "credencial del trabajo" }).status === "not_accepted");
+  check("ID no aceptada", T.start_id_check({ id_type: "credencial del trabajo" }).status === "not_accepted" && T.start_id_check({ id_type: "permiso de trabajo" }).status === "not_accepted");
   check("ID aceptada", T.start_id_check({ id_type: "matrícula consular" }).status === "waiting_for_scan");
   st.kyc.verified = true;
   check("cuenta abierta con KYC", T.open_account().status === "opened");
-  check("destinatario pide método", T.add_recipient({ full_name: "Lupe Martínez", country: "México" }).status === "need_method");
-  check("CLABE inválida", T.add_recipient({ full_name: "Lupe Martínez", country: "México", method: "bank", bank: "BBVA", account_number: "123" }).status === "invalid_clabe");
-  check("destinatario con CLABE de prueba", T.add_recipient({ full_name: "Lupe Martínez", country: "México", method: "bank", bank: "BBVA", use_test_account: true }).status === "ok");
+  check("destinatario pide método", T.add_recipient({ full_name: "Lupe Martínez", country: "México" }).status === "need_city" && T.add_recipient({ full_name: "Lupe Martínez", country: "México", city: "Puebla" }).status === "need_method");
+  check("CLABE inválida", T.add_recipient({ full_name: "Lupe Martínez", country: "México", city: "Puebla", method: "bank", bank: "BBVA", account_number: "123" }).status === "invalid_clabe");
+  check("destinatario con CLABE de prueba", T.add_recipient({ full_name: "Lupe Martínez", country: "México", city: "Puebla", method: "bank", bank: "BBVA", account_number: "002180700123456789" }).status === "ok");
   check("SNPL pide tarjeta", T.payment_options({ recipient: "Lupe", amount_usd: 100 }).options.snpl.reason === "needs_debit_card_for_fees");
-  T.add_debit_card();
+  check("tarjeta pide captura en pantalla", T.add_debit_card({ brand: "Visa" }).status === "waiting_for_card_entry" && !st.debitCard);
+  st.debitCard = { brand: "Visa", last4: "4242" };
   check("SNPL no pasa del aprobado", T.snpl_start({ recipient: "Lupe", amount_usd: 200 }).reason === "over_approved_amount");
   T.snpl_start({ recipient: "Lupe", amount_usd: 100 });
   check("SNPL rechaza PO Box", T.snpl_submit_application({ address: "PO Box 12", esign_accepted: true }).status === "po_box_not_allowed");
@@ -166,6 +167,18 @@ check("EN envío", /\$100 to your sister/.test(o), o);
   const lo = T.offer_cash_loan({ amount_usd: 150 });
   check("préstamo 8 semanas tabla real", lo.payment_usd === 18.88 && lo.total_usd === 153, JSON.stringify(lo));
   check("préstamo depositado", T.confirm_pending().status === "disbursed" && st.account.balance === 150);
+}
+
+// 11. Remesa sin cuenta: Apple Pay y Mastercard
+{
+  const st = C.seedState("new", "Pato", { anonymous: true });
+  const T = C.makeTools(st, { lang: () => "es", card: () => "c", update() {}, later(ms, f) { f(); }, notify() {} });
+  T.add_recipient({ full_name: "Lupe Martínez", country: "México", city: "Puebla", method: "cash", cash_network: "Elektra" });
+  const po = T.payment_options({ recipient: "Lupe", amount_usd: 100 });
+  check("sin cuenta: tarjeta y Apple Pay disponibles", po.options.debit_card.available && po.options.apple_pay.available && !st.account.open);
+  check("Apple Pay listo", T.review_transfer({ recipient: "Lupe", amount_usd: 100, pay_with: "apple_pay" }).pay_with === "apple_pay");
+  check("Apple Pay enviado sin cuenta", T.confirm_pending().status === "sent" && st.account.balance === 0 && Object.values(st.transfers)[0].pay === "apple_pay");
+  check("Mastercard en captura", T.add_debit_card({ brand: "Mastercard" }).brand === "Mastercard" && st.cardDraft.last4 === "5454");
 }
 
 console.log(fails ? `\n${fails} fallas` : "\nTodo bien");
