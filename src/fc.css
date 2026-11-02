@@ -189,3 +189,16 @@
 .fc .ce-f b { font-size: 14px; letter-spacing: .5px; color: #4f6f6a; font-weight: 600; }
 .fc .ce-f.on b { color: #f2fbf9; }
 .fc .btn.apay { background: #000; color: #fff; border-color: #000; }
+
+/* Conversación como chat: en orden, Félix a la izquierda arriba y la persona a la derecha abajo */
+.fc .convo { gap: 10px; }
+.fc .fc-row { display: flex; }
+.fc .fc-row.u { justify-content: flex-end; }
+.fc .fc-you { max-width: 82%; background: #1d4a46; color: #f2fbf9; border-radius: 18px 18px 4px 18px; padding: 9px 13px; font-size: 15px; line-height: 1.35; }
+.fc .fc-say.old { font-size: 16px; line-height: 1.35; font-weight: 500; color: #8fb3ad; letter-spacing: 0; }
+.fc .fc-say.latest { font-size: 23px; }
+.fc .fc-say.latest.long { font-size: 18px; }
+/* Modo escrito: chat completo con burbujas para los dos */
+.fc .screen.fc-chat .fc-say { max-width: 85%; background: #12302d; border: 1px solid #234743; border-radius: 18px 18px 18px 4px; padding: 9px 13px; font-size: 15px; line-height: 1.38; font-weight: 500; color: #f2fbf9; letter-spacing: 0; }
+.fc .screen.fc-chat .fc-ring { width: 56px; height: 56px; margin-top: 4px; }
+.fc .screen.fc-chat .convo { -webkit-mask-image: none; mask-image: none; }

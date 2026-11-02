@@ -585,23 +585,37 @@
     if (atBottom || msgs.length !== before) el.scrollTop = el.scrollHeight;
   }
 
-  // Vista fully conversational: el anillo, la última frase de Félix y la tarjeta del momento
+  // Vista fully conversational como chat: en orden, Félix arriba y la persona abajo.
+  // Con voz se ven los últimos turnos (lo nuevo más grande). Al escribir, es un chat completo con burbujas.
   function renderFC() {
     const el = $("#convo");
+    const chat = !!prefs.kb;
     const roles = msgs.map((m) => m.role);
     const lastU = roles.lastIndexOf("user"), lastF = roles.lastIndexOf("felix");
-    const f = lastF >= 0 ? msgs[lastF].text : "";
     const turnCards = msgs.slice(lastU + 1).filter((m) => m.role === "card" && cards[m.id] && cards[m.id].type !== "named");
-    const card = turnCards.length ? cards[turnCards[turnCards.length - 1].id] : null;
-    const you = lastU > lastF ? msgs[lastU].text : "";
-    $("#screen").classList.toggle("has-card", !!card);
-    const key = [lastF, lastU, card ? card.id + (card.resolved || "") + JSON.stringify(state.transfers) + JSON.stringify(state.kyc || {}) + JSON.stringify(state.snpl || {}) + JSON.stringify(state.cardDraft || {}) + !!state.debitCard + state.applePay : "", status === "listening"].join("|");
-    if (el.dataset.k === key) return;
-    el.dataset.k = key;
-    el.innerHTML = `<div class="spacer-top"></div>
-      ${you ? `<div class="fc-you fade-in">“${esc(you)}”</div>` : ""}
-      ${f ? `<div class="fc-say fade-in ${f.length > 110 ? "long" : ""}">${esc(f)}</div>` : ""}
-      ${card ? `<div class="fc-card fade-in">${cardHTML(card)}</div>` : ""}`;
+    const curCard = turnCards.length ? turnCards[turnCards.length - 1].id : null;
+    $("#screen").classList.toggle("has-card", !!curCard || chat);
+    $("#screen").classList.toggle("fc-chat", chat);
+    // Con voz mostramos solo los últimos turnos para no saturar; al escribir, todo el historial
+    const from = chat ? 0 : Math.max(0, (() => { let n = 0; for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].role === "user" && ++n === 2) return i; } return 0; })());
+    const html = ['<div class="spacer-top"></div>'];
+    msgs.forEach((m, i) => {
+      if (i < from) return;
+      if (m.role === "felix") {
+        const latest = i === lastF && lastF > lastU;
+        html.push(`<div class="fc-row f"><div class="fc-say ${latest ? "latest" : "old"} ${m.text.length > 110 ? "long" : ""}">${esc(m.text)}</div></div>`);
+      } else if (m.role === "user") {
+        html.push(`<div class="fc-row u"><div class="fc-you">${esc(m.text)}</div></div>`);
+      } else if (m.role === "card" && cards[m.id] && cards[m.id].type !== "named" && (chat || m.id === curCard)) {
+        html.push(`<div class="fc-card">${cardHTML(cards[m.id])}</div>`);
+      }
+    });
+    const out = html.join("");
+    if (el.dataset.h === out) return;
+    const grew = (el.dataset.n | 0) !== msgs.length;
+    el.dataset.h = out; el.dataset.n = msgs.length;
+    el.innerHTML = out;
+    if (grew) { const kids = el.querySelectorAll(".fc-row, .fc-card"); const last = kids[kids.length - 1]; if (last) last.classList.add("fade-in"); }
     el.scrollTop = el.scrollHeight;
   }
 
