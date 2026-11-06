@@ -36,4 +36,6 @@ fs.mkdirSync(path.join(__dirname, "public", "chat-voz"), { recursive: true });
 for (const f of ["index.html", "voz.js"]) {
   fs.copyFileSync(path.join(__dirname, "src", "chat-voz", f), path.join(__dirname, "public", "chat-voz", f));
 }
+// Las tools de Houston (mismo archivo que usa /fc) para que la llamada complete todo por voz
+fs.copyFileSync(path.join(__dirname, "src", "core.js"), path.join(__dirname, "public", "chat-voz", "core.js"));
 console.log("public/chat-voz/", "listo");

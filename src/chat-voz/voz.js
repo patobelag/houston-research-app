@@ -241,8 +241,30 @@
 
   let L = null; // sesión en vivo activa
 
-  // El agente de Houston trae sus propias tools. Las conectamos a los flujos de este chat:
-  // cuando Félix "prepara" algo, cerramos la llamada y abrimos ese flujo en pantalla.
+  // ── Cerebro de la llamada: las mismas tools de Houston (src/core.js) ──
+  // Félix completa todo por voz: prepara, pide confirmación y ejecuta, sin salir de la llamada.
+  // Solo si la persona pide verlo en pantalla o escribir, cerramos la llamada y abrimos el flujo del chat.
+  const C = window.FelixCore;
+  let core = null; // { state, tools } se conserva entre llamadas
+  function getCore() {
+    if (core || !C) return core;
+    const state = C.seedState("steady", "Juan");
+    const hooks = {
+      card() { return "c" + Date.now(); },
+      update() {},
+      later(ms, fn) { setTimeout(fn, ms); },
+      notify(txt) {
+        // Avisos que llegan después (por ejemplo "tu envío ya llegó")
+        if (L && L.conv) { try { L.conv.sendContextualUpdate(txt.en); } catch (e) {} }
+        else bubble("f", esc(txt.es));
+      },
+      lang() { return "es"; },
+    };
+    core = { state, tools: C.makeTools(state, hooks) };
+    return core;
+  }
+
+  // Qué flujo del chat corresponde a cada tool (solo se usa si la persona pide verlo en pantalla)
   const HOUSTON = {
     prepare_transfer: "enviar", show_quote: "calcular", review_transfer: "enviar", payment_options: "enviar",
     offer_pay_later: "enviar", snpl_start: "enviar",
@@ -254,19 +276,39 @@
     show_card: "tarjetas", set_card_frozen: "tarjetas", add_debit_card: "tarjetas",
     talk_to_human: "hablar_con_persona",
   };
-  const NOOP = ["set_user_name", "confirm_pending", "cancel_pending", "show_profile", "show_product", "prepare_topup",
-    "accept_terms", "save_identity", "start_id_check", "snpl_submit_application", "snpl_accept_terms"];
-  function houstonTools(s) {
+
+  function coreTools(s) {
+    const c = getCore();
     const out = {};
-    Object.entries(HOUSTON).forEach(([name, flujo]) => {
-      out[name] = async () => {
-        s.pending = flujo;
-        setTimeout(() => { if (L === s) endLive(); }, 2600);
-        return JSON.stringify({ status: "ok", nota: `En pantalla se abre ${FLOWS[flujo][0]}. La persona termina ahí. Despídete en una frase corta y no pidas más datos.` });
+    if (!c) return out;
+    Object.keys(c.tools).forEach((name) => {
+      out[name] = async (params) => {
+        const p = Object.assign({}, params || {});
+        if (name === "save_payday" && typeof p.payday === "string") p.payday = { es: p.payday, en: p.payday };
+        if (HOUSTON[name]) s.lastFlow = HOUSTON[name];
+        let res;
+        try { res = c.tools[name](p); } catch (e) { console.error(e); res = { status: "error" }; }
+        return JSON.stringify(res === undefined ? { status: "ok" } : res);
       };
     });
-    NOOP.forEach((name) => { out[name] = async () => JSON.stringify({ status: "ok", nota: "Esto se hace en la pantalla del chat. Ofrece abrir el flujo que necesite." }); });
     return out;
+  }
+
+  // ¿La persona pidió verlo en pantalla o escribir?
+  const WANTS_SCREEN = /(en (la )?pantalla|en el chat|por escrito|prefiero (escribir|verlo|leerlo)|quiero (verlo|leerlo|escribir)|(muestra|ensena|abre)(me|melo|lo)?\b.*\b(pantalla|chat|app|aplicacion))/;
+  const KEYFLOW = {
+    enviar: /envi|mand|remes|giro/, pagar_servicio: /pag.*(luz|agua|internet|servicio|recibo)|luz|cfe|izzi/,
+    prestamo: /prestamo|credito/, billetera: /billetera|abrir.*cuenta/, calcular: /calcul|tipo de cambio|cuanto (llega|recibe)/,
+    historial: /historial|movimient/, resumen: /resumen|saldo/, depositar: /ingresar|depositar|recargar mi cuenta/,
+    retirar: /retirar|sacar/, tarjetas: /tarjeta/, destinatarios: /destinatari|contacto/, hablar_con_persona: /persona|agente|humano/,
+  };
+  function screenRequest(s, text) {
+    const t = norm(text);
+    if (!WANTS_SCREEN.test(t)) return false;
+    s.pending = Object.keys(KEYFLOW).find((k) => KEYFLOW[k].test(t)) || s.lastFlow || null;
+    try { s.conv && s.conv.sendContextualUpdate("The user asked to continue on screen. Say in one short sentence that you are opening it on screen now, then stop."); } catch (e) {}
+    setTimeout(() => { if (L === s) endLive(); }, 2600);
+    return true;
   }
 
   lv.onclick = async () => {
@@ -282,20 +324,28 @@
     cstat.textContent = text;
   }
 
+  // Contexto para el agente, con el mismo formato que usa Houston
   function contextString() {
-    const people = (typeof PEOPLE !== "undefined" ? PEOPLE : []).map((p) => p.name).join(", ") || "ninguno";
-    const bills = (st.bills || []).filter((b) => !b.paid).map((b) => `${b.name} $${b.amt} vence ${b.due}`).join("; ") || "ninguno";
+    const c = getCore();
+    if (!c) return "";
+    const x = c.state, tr = C.tr;
+    const recs = x.recipients.map((r) => `${r.name} (${tr(r.short, "es")}, id ${r.id}, ${r.city}, ${r.country})`).join("; ") || "ninguno";
     return [
-      `Billetera Félix: ${st.hasAcct ? "abierta, saldo $" + (st.acct.bal || 0).toFixed(2) : "no la ha abierto"}.`,
-      `Destinatarios guardados: ${people}.`,
-      `Servicios pendientes: ${bills}.`,
-      st.pending ? `Envío en proceso: $${st.pending.usd} a ${st.pending.p.first}.` : "Sin envíos en proceso.",
-      st.loan ? "Tiene un préstamo activo." : "Sin préstamo activo.",
+      `Nombre: ${x.user.name}. Idioma de la interfaz: español.`,
+      `Escenario: usuario actual. account_open = ${x.account.open}.`,
+      x.account.open ? `Saldo: $${x.account.balance}. Tarjeta débito •••• ${x.account.card ? x.account.card.last4 : "-"}${x.account.card && x.account.card.frozen ? " (congelada)" : ""}.` : "Aún no tiene cuenta.",
+      `Crédito disponible: $${(x.credit.limit - x.credit.used).toFixed(2)}.`,
+      `Familiares guardados: ${recs}.`,
+      x.loan ? `Préstamo activo: cuota ${x.loan.paid + 1} de ${x.loan.n}, $${x.loan.installment}, vence ${x.loan.due.es}.` : "Sin préstamo activo.",
+      `Servicios pendientes: ${(x.bills || []).filter((b) => !b.paid).map((b) => `${b.label.es} (${b.provider}) $${b.amount}, vence ${b.due.es}`).join("; ") || "ninguno"}.`,
+      `Día de pago: ${x.payday ? tr(x.payday, "es") : "no definido"}.`,
+      "Esta es una llamada de voz: completa todo por voz, pide confirmación antes de ejecutar y no mandes a la persona a la pantalla. Si la persona pide verlo en pantalla o escribir, la app lo abre sola.",
     ].join("\n");
   }
 
   async function startLive() {
-    L = { lines: [], startedAt: Date.now(), muted: false, speaker: true, pending: null };
+    const c0 = getCore();
+    L = { lines: [], startedAt: Date.now(), muted: false, speaker: true, pending: null, lastFlow: null, movesBefore: c0 ? c0.state.movements.length : 0 };
     $("#cmute").classList.remove("on"); $("#cspk").classList.remove("on");
     cap.textContent = "";
     setCall("", "Conectando…");
@@ -323,7 +373,7 @@
       connectionType: "webrtc",
       dynamicVariables: { user_context: contextString(), first_message: "Hola, soy Félix. ¿En qué te ayudo hoy?" },
       clientTools: {
-        ...houstonTools(s),
+        ...coreTools(s),
         abrir_flujo: async ({ flujo }) => {
           if (!FLOWS[flujo]) return JSON.stringify({ ok: false, error: "flujo desconocido", disponibles: Object.keys(FLOWS) });
           s.pending = flujo;
@@ -338,6 +388,7 @@
         if (!text || /^[.\s…]*$/.test(text)) return;
         s.lines.push([who, text]);
         cap.textContent = text;
+        if (who === "u") screenRequest(s, text);
       },
       onModeChange: ({ mode }) => {
         if (L !== s) return;
@@ -443,7 +494,7 @@
   $("#cend").onclick = () => endLive();
 
   // Solo para pruebas (?debug=1): permite simular una llamada sin micrófono
-  if (/[?&]debug=1/.test(location.search)) window.__felixVoz = { FLOWS, endLive, get live() { return L; } };
+  if (/[?&]debug=1/.test(location.search)) window.__felixVoz = { FLOWS, endLive, coreTools, getCore, screenRequest, get live() { return L; } };
 
   async function endLive() {
     const s = L; if (!s) return;
@@ -464,6 +515,17 @@
       lastFrom = null;
       lines.forEach(([who, t]) => bubble(who, esc(t)));
       toEnd();
+    }
+    // Resumen de lo que Félix hizo durante la llamada
+    const c = getCore();
+    if (c) {
+      const fresh = c.state.movements.slice(0, Math.max(0, c.state.movements.length - s.movesBefore));
+      if (fresh.length) {
+        const fmt = (n) => (n < 0 ? "−" : "+") + "$" + Math.abs(n).toFixed(2);
+        const items = fresh.map((m) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0"><span>${esc(C.tr(m.title, "es"))}</span><b style="font-weight:600">${fmt(m.amount)}</b></div>`).join("");
+        bubble("f", `<div style="min-width:230px"><div style="font-weight:600;margin-bottom:6px">Listo por voz</div>${items}<div style="margin-top:6px;font-size:13.5px;color:var(--mut)">Saldo: $${c.state.account.balance.toFixed(2)} USD</div></div>`, { wide: true });
+        toEnd();
+      }
     }
     if (s.pending && FLOWS[s.pending] && st.mode !== "busy" && !S.res) {
       const [, run] = FLOWS[s.pending];
