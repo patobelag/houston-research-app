@@ -30,3 +30,10 @@ onb = onb.replace("/*@@ONB@@*/", () => src("onboarding.js"));
 fs.mkdirSync(path.join(__dirname, "public", "onboarding"), { recursive: true });
 fs.writeFileSync(path.join(__dirname, "public", "onboarding", "index.html"), onb);
 console.log("public/onboarding/index.html", (onb.length / 1024).toFixed(1) + " KB");
+
+// Chat con voz (link aparte): public/chat-voz/  (UI del chat modal + nota de voz y voz en vivo)
+fs.mkdirSync(path.join(__dirname, "public", "chat-voz"), { recursive: true });
+for (const f of ["index.html", "voz.js"]) {
+  fs.copyFileSync(path.join(__dirname, "src", "chat-voz", f), path.join(__dirname, "public", "chat-voz", f));
+}
+console.log("public/chat-voz/", "listo");
