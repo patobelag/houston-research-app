@@ -1472,18 +1472,18 @@ const rcLoan=(ds,card)=>`<div class="rc"><div class="rh"><b>PRÉSTAMO</b><span c
 /* ── widget: abrir Cuenta Félix ── */
 function cuentaWidget(){
   const pr=S.open();let idv="",tc=false;
-  const s1=()=>S.set({title:"Abrir billetera",step:"Paso 1 de 2",
+  const s1=()=>S.set({title:"Abrir Cuenta Félix",step:"Paso 1 de 2",
     html:`<div class="q">Ingresa el número de tu identificación oficial.</div>
       <div class="lbl" style="margin-top:0">Número de identificación oficial</div>
       <label class="field"><input id="gid" type="text" maxlength="24" placeholder="Número de tu identificación" autocomplete="off"></label>
       <div class="hintx">Debe ser una identificación oficial emitida por el gobierno.</div>`,
     cta:{label:"Continuar",off:idv.trim().length<5,fn:s2},
     bind:()=>{const g=$("#gid");g.value=idv;g.oninput=()=>{idv=g.value;setCta("Continuar",idv.trim().length<5)}}});
-  const s2=()=>S.set({title:"Abrir billetera",step:"Paso 2 de 2",back:s1,
+  const s2=()=>S.set({title:"Abrir Cuenta Félix",step:"Paso 2 de 2",back:s1,
     html:`<div class="q">Revisa y acepta los términos y condiciones.</div>
-      <p class="warn">Al abrir tu billetera aceptas los términos y condiciones.</p>
+      <p class="warn">Al abrir tu Cuenta Félix aceptas los términos y condiciones.</p>
       <button class="opt${tc?" on":""}" id="tcb"><span class="tx"><b>Acepto los términos y condiciones</b></span><span class="rad">${tc?svg(P.check,13):""}</span></button>`,
-    cta:{label:"Abrir billetera",off:!tc,fn:async()=>{setCta("Abriendo…",true);await sleep(1400);S.close(true)}},
+    cta:{label:"Abrir Cuenta Félix",off:!tc,fn:async()=>{setCta("Abriendo…",true);await sleep(1400);S.close(true)}},
     bind:()=>{$("#tcb").onclick=()=>{tc=!tc;s2()}}});
   s1();return pr;
 }
@@ -1550,7 +1550,7 @@ async function menu(text,ice,keepQ){
   await bot(text,{buttons:ice?[
     {label:"Enviar dinero",icon:IC("send"),run:doSend},
     {label:"Pedir un préstamo",icon:IC("trend"),run:doLoan},
-    st.hasAcct?{label:"Pagar servicios",icon:IC("bolt"),run:doPay}:{label:"Abrir billetera",icon:IC("card"),run:doCuenta},
+    st.hasAcct?{label:"Pagar servicios",icon:IC("bolt"),run:doPay}:{label:"Abrir Cuenta Félix",icon:IC("card"),run:doCuenta},
     {label:"Calcular un envío",icon:IC("calc"),run:doCalc}]:[
     {label:"Enviar dinero",icon:IC("send"),run:doSend},
     {label:"Pagar servicios",icon:IC("bolt"),run:doPay}]});
@@ -1768,15 +1768,15 @@ async function doLoan(){
   await more();
 }
 async function doCuenta(){
-  if(st.hasAcct)return menu("Ya tienes tu billetera. ¿Qué más quieres hacer?");
+  if(st.hasAcct)return menu("Ya tienes tu Cuenta Félix. ¿Qué más quieres hacer?");
   const r=await cuentaWidget();
-  if(!r)return menu("No hay problema, no abrimos ninguna billetera. ¿Qué quieres hacer?",false,true);
+  if(!r)return menu("No hay problema, no abrimos tu Cuenta Félix. ¿Qué quieres hacer?",false,true);
   st.hasAcct=true;renderZone();refreshDrawer();
-  await menu("Listo, abriste tu billetera. ¿Qué más quieres hacer?");
+  await menu("Listo, abriste tu Cuenta Félix. ¿Qué más quieres hacer?");
 }
 async function offerCuenta(){
-  await bot("Para usar esto necesitas una billetera. ¿La abrimos ahora?",{buttons:[
-    {label:"Abrir billetera",icon:IC("card"),run:doCuenta},
+  await bot("Para usar esto necesitas una Cuenta Félix. ¿La abrimos ahora?",{buttons:[
+    {label:"Abrir Cuenta Félix",icon:IC("card"),run:doCuenta},
     {label:"Ahora no",icon:IC("x"),run:more}]});
   setMode("menu");
 }
@@ -1971,8 +1971,8 @@ const MENU=[
   {label:"Mis destinatarios",ic:"users",run:doRecipients},
   {label:"Cancelar un envío",ic:"x",run:doCancel},
   {label:"Últimos movimientos",ic:"hist",run:doHistory}]},
- {g:"Billetera",items:[
-  {label:"Abrir billetera",ic:"card",run:doCuenta},
+ {g:"Cuenta Félix",items:[
+  {label:"Abrir Cuenta Félix",ic:"card",run:doCuenta},
   {label:"Resumen de mi cuenta",ic:"doc",run:doSummary},
   {label:"Mis tarjetas",ic:"card",run:doCards},
   {label:"Depositar dinero",ic:"down",run:doDeposit},
@@ -1987,7 +1987,7 @@ const MENU=[
 const TOOLS=[
  {label:"Calculadora",d:"1 USD = "+rateTxt(CTRY.mx.rate)+" MXN",ic:"calc",run:doCalc},
  {label:"Alerta del dólar",d:"Avísame cuando suba",ic:"bell",tag:"Nuevo",run:doAlert},
- {get label(){return st.hasAcct?"Mi billetera":"Abrir billetera"},get d(){return st.hasAcct?"Saldo "+usd(st.acct.bal):"Guarda tu dinero en dólares"},ic:"card",get run(){return st.hasAcct?doSummary:doCuenta}},
+ {get label(){return st.hasAcct?"Mi Cuenta Félix":"Abrir Cuenta Félix"},get d(){return st.hasAcct?"Saldo "+usd(st.acct.bal):"Guarda tu dinero en dólares"},ic:"card",get run(){return st.hasAcct?doSummary:doCuenta}},
  {label:"Pagar servicios",d:"Luz, internet y más",ic:"bolt",run:doPay}];
 const gridHTML=()=>TOOLS.map((t,i)=>`<button class="fy-t" data-t="${i}"><span class="ic">${IC(t.ic)}</span><b>${t.label}</b><span class="dd">${t.d}</span>${t.tag?`<em>${t.tag}</em>`:""}</button>`).join("");
 function refreshDrawer(){
@@ -1999,7 +1999,7 @@ drawer.innerHTML=`<div class="dh"><div class="av" id="dav">${svg(P.user,24)}</di
 <div class="dbody"><div class="lockn">Verifica tu número en el chat para usar estos accesos. La ayuda siempre está disponible.</div>
 <button class="promo" id="promo"><span><b>Invita y gana</b><small>Gana cuando tus amigos hagan su primer envío</small></span>${svg(P.go,22)}</button>
 <div class="grp">Accesos rápidos</div><div class="fy-grid">${gridHTML()}</div>
-${MENU.map((g,gi)=>`<div class="grp"${g.g==="Billetera"?" data-w hidden":""}>${g.g}</div>`+g.items.map((it,ii)=>`<button class="it${it.help?" free":""}"${g.g==="Billetera"?" data-w hidden":""} data-g="${gi}" data-i="${ii}"><span class="ii">${IC(it.ic)}</span><span class="t">${it.label}</span>${it.soon?'<span class="soon">Pronto</span>':""}</button>`).join("")).join("")}</div>`;
+${MENU.map((g,gi)=>`<div class="grp"${g.g==="Cuenta Félix"?" data-w hidden":""}>${g.g}</div>`+g.items.map((it,ii)=>`<button class="it${it.help?" free":""}"${g.g==="Cuenta Félix"?" data-w hidden":""} data-g="${gi}" data-i="${ii}"><span class="ii">${IC(it.ic)}</span><span class="t">${it.label}</span>${it.soon?'<span class="soon">Pronto</span>':""}</button>`).join("")).join("")}</div>`;
 drawer.classList.add("locked");
 function openDrawer(){dov.classList.add("on");drawer.classList.add("on")}
 function closeDrawer(){dov.classList.remove("on");drawer.classList.remove("on")}
@@ -2143,7 +2143,7 @@ function renderZone(){
   const chev='<svg class="i" width="16" height="16" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>';
   let left;
   if(st.hasAcct){const b=usd(st.acct.bal);left=`<button class="zst" data-z="bal" aria-label="Tu saldo: ${b}. Ver resumen"><small>Saldo</small><span class="zv">${b.split(".")[0]}<i class="zdec" aria-hidden="true">.${b.split(".")[1]}</i>${chev}</span></button>`}
-  else left=`<button class="zst" data-z="cta" aria-label="Abrir billetera"><small>Billetera</small><span class="zv">Abrir${chev}</span></button>`;
+  else left=`<button class="zst" data-z="cta" aria-label="Abrir Cuenta Félix"><small>Cuenta Félix</small><span class="zv">Abrir${chev}</span></button>`;
   const rk=st.rc||"mx",rc=CTRY[rk];
   zc.innerHTML=left+`<button class="zst r" data-z="rate" aria-haspopup="dialog" aria-label="Tipo de cambio hoy: ${rateTxt(rc.rate)} ${rc.n}. Cambiar moneda"><small>Tipo de cambio hoy</small><span class="zv">$${rateTxt(rc.rate)} <i class="zcur">${rc.cur}</i>${chev}</span></button>`;
   zm.innerHTML="";
@@ -2151,7 +2151,7 @@ function renderZone(){
     const z=b.dataset.z;
     if(z==="rate")rateWidget().then(k=>{if(k){st.rc=k;renderZone();$("#sr").textContent="Moneda: "+CTRY[k].cur}});
     else if(z==="bal")shortcut({label:"Resumen de mi cuenta",run:doSummary});
-    else shortcut({label:"Abrir billetera",run:doCuenta});
+    else shortcut({label:"Abrir Cuenta Félix",run:doCuenta});
   });
 }
 $("#bolt").onclick=()=>{if(!st.authed||st.mode!=="menu"||S.res)return;if(qoOn&&!qo.classList.contains("min"))qoMin(true);else{qoMin(false);qoShow(true)}};

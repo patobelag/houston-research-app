@@ -225,7 +225,7 @@
     enviar: ["Enviar dinero", () => doSend()],
     pagar_servicio: ["Pagar servicios", () => doPay()],
     prestamo: ["Pedir un préstamo", () => doLoan()],
-    billetera: ["Abrir billetera", () => doCuenta()],
+    billetera: ["Abrir Cuenta Félix", () => doCuenta()],
     calcular: ["Calcular un envío", () => doCalc()],
     historial: ["Ver mis envíos", () => doHistory()],
     resumen: ["Resumen de mi cuenta", () => doSummary()],
@@ -335,7 +335,7 @@
       const pp = c.people[idx];
       if (!pp) return;
       const fee = C.CONFIG.fee;
-      const card = t.pay === "balance" || (!t.pay && x.account.open) ? { brand: "Billetera Félix", last: "", bal: true } : (CARDS.find((cc) => cc.debit) || CARDS[0]);
+      const card = t.pay === "balance" || (!t.pay && x.account.open) ? { brand: "Cuenta Félix", last: "", bal: true } : (CARDS.find((cc) => cc.debit) || CARDS[0]);
       const xr = { p: pp, usd: t.amount, fee, tot: syncNum(t.amount + fee), got: t.receive != null ? t.receive : null, card, cost: 0,
         folio: "FX-" + (48000000 + Math.floor(Math.random() * 999999)), status: t.step === 2 ? "delivered" : "process", date: dateTxt(), voz: true };
       st.xfers.push(xr);
@@ -414,7 +414,7 @@
     const recs = x.recipients.map((r) => `${r.name} (${tr(r.short, "es")}, id ${r.id}, ${r.city}, ${r.country})`).join("; ") || "ninguno";
     return [
       `Nombre: ${x.user.name}. Idioma de la interfaz: español.`,
-      `Escenario: ${x.account.open ? "usuario con billetera Félix" : "usuario sin billetera Félix: paga los envíos con tarjeta de débito " + (x.debitCard ? x.debitCard.brand + " ••" + x.debitCard.last4 : "") + " o Apple Pay"}. account_open = ${x.account.open}.`,
+      `Escenario: ${x.account.open ? "usuario con Cuenta Félix" : "usuario sin Cuenta Félix: paga los envíos con tarjeta de débito " + (x.debitCard ? x.debitCard.brand + " ••" + x.debitCard.last4 : "") + " o Apple Pay"}. account_open = ${x.account.open}.`,
       x.account.open ? `Saldo: $${x.account.balance}. Tarjeta débito •••• ${x.account.card ? x.account.card.last4 : "-"}${x.account.card && x.account.card.frozen ? " (congelada)" : ""}.` : "Aún no tiene cuenta.",
       `Crédito disponible: $${(x.credit.limit - x.credit.used).toFixed(2)}.`,
       `Familiares guardados: ${recs}.`,
