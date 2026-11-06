@@ -245,23 +245,105 @@
   // Félix completa todo por voz: prepara, pide confirmación y ejecuta, sin salir de la llamada.
   // Solo si la persona pide verlo en pantalla o escribir, cerramos la llamada y abrimos el flujo del chat.
   const C = window.FelixCore;
-  let core = null; // { state, tools } se conserva entre llamadas
-  function getCore() {
-    if (core || !C) return core;
+  let core = null; // { state, tools, people, billIdx } de la llamada actual
+
+  // ── Sincronización: el chat escrito es la fuente de verdad ──
+  // Al iniciar la llamada, el estado del chat (billetera, saldo, familiares, servicios, historial)
+  // se convierte al formato de Houston. Al colgar, lo que Félix hizo por voz se escribe de vuelta.
+  const RELKEY = { "mamá": "mama", "papá": "papa", "hermano": "hermano", "hermana": "hermana", "tía": "tia", "tío": "tio",
+    "esposa": "esposa", "esposo": "esposo", "hija": "hija", "hijo": "hijo", "abuela": "abuela", "abuelo": "abuelo" };
+  const COREC = { mx: "MX", co: "CO", gt: "GT", hn: "HN" };
+  const xferLinks = []; // envíos hechos por voz: { state, tid, x } para marcar "entregado" cuando llegue
+  const syncNum = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+  function buildCore() {
+    if (!C) return null;
+    // Mismos tipos de cambio que muestra el chat
+    Object.entries(COREC).forEach(([k, K]) => { if (CTRY[k] && C.CONFIG.rates[K]) C.CONFIG.rates[K].rate = CTRY[k].rate; });
     const state = C.seedState("steady", "Juan");
+    const people = PEOPLE.filter((pp) => COREC[pp.flag]);
+    state.recipients = people.map((pp, i) => ({
+      id: "r" + i, rel: RELKEY[norm(pp.rel || "")] || RELKEY[(pp.rel || "").toLowerCase()] || null,
+      name: pp.name, short: { es: pp.rel ? `${pp.rel} (${pp.first})` : pp.first, en: pp.first },
+      city: pp.city, country: COREC[pp.flag], method: pp.dest || "",
+    }));
+    state.account = st.hasAcct ? { open: true, balance: syncNum(st.acct.bal), card: { last4: "3307", frozen: false } } : { open: false, balance: 0, card: null };
+    state.credit = { limit: typeof LIMIT !== "undefined" ? LIMIT : 300, used: syncNum(st.acct.owed) };
+    state.loan = null; state.loan8 = null;
+    const debit = CARDS.find((c) => c.debit);
+    state.debitCard = debit ? { brand: debit.brand, last4: debit.last } : null;
+    const billIdx = [];
+    state.bills = (st.bills || []).map((b, i) => {
+      billIdx.push(i);
+      const prov = (b.name.split("·")[1] || b.name).trim();
+      return { id: "b" + i, kind: norm(b.key || "").replace(/^(la|el) /, ""), provider: prov, rid: null,
+        label: { es: b.name.split("·")[0].trim(), en: b.name.split("·")[0].trim() }, amount: b.amt, due: { es: b.due, en: b.due }, paid: !!b.paid };
+    });
+    state.movements = (st.hist || []).map((h, i) => ({ id: "h" + i, kind: h.a < 0 ? "out" : "in", title: { es: h.t, en: h.t }, date: { es: h.d, en: h.d }, amount: h.a }));
+    state.phones = {}; state.payday = null;
     const hooks = {
       card() { return "c" + Date.now(); },
-      update() {},
+      update() { markDelivered(); },
       later(ms, fn) { setTimeout(fn, ms); },
       notify(txt) {
+        markDelivered();
         // Avisos que llegan después (por ejemplo "tu envío ya llegó")
         if (L && L.conv) { try { L.conv.sendContextualUpdate(txt.en); } catch (e) {} }
         else bubble("f", esc(txt.es));
       },
       lang() { return "es"; },
     };
-    core = { state, tools: C.makeTools(state, hooks) };
-    return core;
+    return { state, tools: C.makeTools(state, hooks), people, billIdx,
+      before: { movs: state.movements.length, recs: state.recipients.length, tids: Object.keys(state.transfers), used: state.credit.used } };
+  }
+  function getCore() { if (!core) core = buildCore(); return core; }
+
+  function markDelivered() {
+    xferLinks.forEach((k) => {
+      const t = k.state.transfers[k.tid];
+      if (t && t.step === 2 && k.x.status === "process") {
+        k.x.status = "delivered";
+        if (st.pending === k.x) st.pending = null;
+      }
+    });
+  }
+
+  // Escribe en el chat lo que pasó en la llamada
+  function syncBack(c) {
+    if (!c) return;
+    const x = c.state;
+    if (x.account.open) { st.hasAcct = true; st.acct.bal = syncNum(x.account.balance); }
+    st.acct.owed = syncNum(st.acct.owed + (x.credit.used - c.before.used));
+    // Movimientos nuevos → historial del chat
+    x.movements.slice(0, Math.max(0, x.movements.length - c.before.movs)).reverse()
+      .forEach((m) => st.hist.unshift({ t: C.tr(m.title, "es"), d: dShort(), a: m.amount }));
+    // Servicios pagados
+    x.bills.forEach((b, i) => { if (b.paid && st.bills[c.billIdx[i]]) st.bills[c.billIdx[i]].paid = true; });
+    // Familiares nuevos
+    x.recipients.slice(c.before.recs).forEach((r) => {
+      const flag = Object.keys(COREC).find((k) => COREC[k] === r.country);
+      if (!flag || PEOPLE.some((pp) => norm(pp.name) === norm(r.name))) return;
+      try {
+        const np = mkP(r.name, C.tr(r.short, "es") || "Familiar", flag, r.city, r.cash ? "cash" : "bank");
+        PEOPLE.push(np); c.people.push(np);
+      } catch (e) {}
+    });
+    // Envíos nuevos → aparecen en "Mis envíos" del chat
+    Object.keys(x.transfers).filter((tid) => !c.before.tids.includes(tid)).forEach((tid) => {
+      const t = x.transfers[tid];
+      const idx = x.recipients.findIndex((r) => r.id === t.rid);
+      const pp = c.people[idx];
+      if (!pp) return;
+      const fee = C.CONFIG.fee;
+      const card = t.pay === "balance" || (!t.pay && x.account.open) ? { brand: "Billetera Félix", last: "", bal: true } : (CARDS.find((cc) => cc.debit) || CARDS[0]);
+      const xr = { p: pp, usd: t.amount, fee, tot: syncNum(t.amount + fee), got: t.receive != null ? t.receive : null, card, cost: 0,
+        folio: "FX-" + (48000000 + Math.floor(Math.random() * 999999)), status: t.step === 2 ? "delivered" : "process", date: dateTxt(), voz: true };
+      st.xfers.push(xr);
+      if (xr.status === "process") st.pending = xr;
+      xferLinks.push({ state: x, tid, x: xr });
+    });
+    try { renderZone(); } catch (e) {}
+    try { refreshDrawer(); } catch (e) {}
   }
 
   // Qué flujo del chat corresponde a cada tool (solo se usa si la persona pide verlo en pantalla)
@@ -332,7 +414,7 @@
     const recs = x.recipients.map((r) => `${r.name} (${tr(r.short, "es")}, id ${r.id}, ${r.city}, ${r.country})`).join("; ") || "ninguno";
     return [
       `Nombre: ${x.user.name}. Idioma de la interfaz: español.`,
-      `Escenario: usuario actual. account_open = ${x.account.open}.`,
+      `Escenario: ${x.account.open ? "usuario con billetera Félix" : "usuario sin billetera Félix: paga los envíos con tarjeta de débito " + (x.debitCard ? x.debitCard.brand + " ••" + x.debitCard.last4 : "") + " o Apple Pay"}. account_open = ${x.account.open}.`,
       x.account.open ? `Saldo: $${x.account.balance}. Tarjeta débito •••• ${x.account.card ? x.account.card.last4 : "-"}${x.account.card && x.account.card.frozen ? " (congelada)" : ""}.` : "Aún no tiene cuenta.",
       `Crédito disponible: $${(x.credit.limit - x.credit.used).toFixed(2)}.`,
       `Familiares guardados: ${recs}.`,
@@ -344,7 +426,8 @@
   }
 
   async function startLive() {
-    const c0 = getCore();
+    core = buildCore();
+    const c0 = core;
     L = { lines: [], startedAt: Date.now(), muted: false, speaker: true, pending: null, lastFlow: null, movesBefore: c0 ? c0.state.movements.length : 0 };
     $("#cmute").classList.remove("on"); $("#cspk").classList.remove("on");
     cap.textContent = "";
@@ -517,7 +600,8 @@
       toEnd();
     }
     // Resumen de lo que Félix hizo durante la llamada
-    const c = getCore();
+    const c = core;
+    syncBack(c);
     if (c) {
       const fresh = c.state.movements.slice(0, Math.max(0, c.state.movements.length - s.movesBefore));
       if (fresh.length) {
